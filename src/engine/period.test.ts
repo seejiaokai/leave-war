@@ -11,6 +11,14 @@ describe('isWeekend', () => {
     expect(isWeekend('2026-01-02')).toBe(false)
     expect(isWeekend('2026-01-05')).toBe(false)
   })
+
+  it('uses UTC weekday, not local time (catches local-accessor regressions)', () => {
+    // 2026-01-03 is Saturday (day 6) in UTC.
+    // Under Pacific/Midway (UTC-11), 2026-01-03 00:00:00 UTC = 2026-01-02 13:00:00 local (Friday, day 5).
+    // A buggy `new Date(ms).getDay()` would return 5 (Friday), failing this assertion.
+    // The correct `new Date(ms).getUTCDay()` returns 6 (Saturday), passing it.
+    expect(isWeekend('2026-01-03')).toBe(true)
+  })
 })
 
 describe('addDays', () => {
