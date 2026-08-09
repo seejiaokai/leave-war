@@ -46,7 +46,9 @@ describe('seed', () => {
     const peopleIds = new Set(people.map(p => p.id))
     const grid = seedGrid()
     for (const id of Object.keys(grid)) {
-      expect(peopleIds.has(id)).toBe(true, `grid contains unknown id: ${id}`)
+      if (!peopleIds.has(id)) {
+        throw new Error(`grid contains unknown id: ${id}`)
+      }
     }
   })
 
@@ -54,9 +56,10 @@ describe('seed', () => {
     const grid = seedGrid()
     for (const [id, days] of Object.entries(grid)) {
       for (const [date, code] of Object.entries(days)) {
-        expect(codeOf(code)).toBeDefined(
-          `grid[${id}]['${date}'] has unknown code: ${code}`
-        )
+        const resolved = codeOf(code)
+        if (resolved === undefined) {
+          throw new Error(`grid[${id}]['${date}'] has unknown code: ${code}`)
+        }
       }
     }
   })
