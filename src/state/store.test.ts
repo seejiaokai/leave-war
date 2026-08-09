@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { getState, getVersion, initStore, setCell, subscribe } from './store'
+import { advanceStage, getState, getVersion, initStore, setBidState, setCell, subscribe } from './store'
 import { localBackend, memoryBackend } from './storage'
 
 beforeEach(() => {
@@ -135,5 +135,180 @@ describe('initStore subscriber contract', () => {
     initStore(memoryBackend())
     setCell('ramp', '2026-01-25', 'LL')
     expect(fn).not.toHaveBeenCalled()
+  })
+})
+
+describe('bids', () => {
+  it('makes a new leave cell pending by itself', () => {
+    setCell('ramp', '2026-02-02', 'LL')
+    expect(getState().states.ramp['2026-02-02']).toBe('pending')
+  })
+
+  it('gives a non-bid code no state at all', () => {
+    setCell('ramp', '2026-02-03', 'CSE')
+    expect(getState().states.ramp?.['2026-02-03']).toBeUndefined()
+  })
+
+  it('drops the state when the cell is cleared', () => {
+    setCell('ramp', '2026-02-04', 'LL')
+    setCell('ramp', '2026-02-04', '')
+    expect(getState().states.ramp?.['2026-02-04']).toBeUndefined()
+  })
+
+  it('drops the state when a bid is overwritten by a non-bid code', () => {
+    setCell('ramp', '2026-02-05', 'LL')
+    setCell('ramp', '2026-02-05', 'M')
+    expect(getState().states.ramp?.['2026-02-05']).toBeUndefined()
+  })
+
+  it('keeps a decision when the same code is rewritten', () => {
+    setCell('ramp', '2026-02-06', 'LL')
+    setBidState('ramp', '2026-02-06', 'approved')
+    setCell('ramp', '2026-02-06', 'LL')
+    expect(getState().states.ramp['2026-02-06']).toBe('approved')
+  })
+
+  // Changing WHAT was asked for is a new ask. Re-typing LL over an approved
+  // LL keeps the approval (above); turning it into OL must not inherit one —
+  // nobody approved a week overseas.
+  it('resets the decision when the bid is changed to different leave', () => {
+    setCell('ramp', '2026-02-06', 'LL')
+    setBidState('ramp', '2026-02-06', 'approved')
+    setCell('ramp', '2026-02-06', 'OL')
+    expect(getState().states.ramp['2026-02-06']).toBe('pending')
+  })
+
+  it('records a decision', () => {
+    setCell('ramp', '2026-02-07', 'LL')
+    setBidState('ramp', '2026-02-07', 'refused')
+    expect(getState().states.ramp['2026-02-07']).toBe('refused')
+  })
+
+  // The one invariant the parallel map exists to keep: a state never lives
+  // on a cell nobody bid for. setCell enforces it; so must setBidState.
+  it('refuses to decide a cell nobody bid for', () => {
+    setCell('ramp', '2026-02-12', 'CSE')
+    setBidState('ramp', '2026-02-12', 'approved')
+    expect(getState().states.ramp?.['2026-02-12']).toBeUndefined()
+    setBidState('ramp', '2026-02-13', 'approved')
+    expect(getState().states.ramp?.['2026-02-13']).toBeUndefined()
+  })
+
+  it('bumps the version so the interface re-reads', () => {
+    setCell('ramp', '2026-02-08', 'LL')
+    const before = getVersion()
+    setBidState('ramp', '2026-02-08', 'approved')
+    expect(getVersion()).toBe(before + 1)
+  })
+
+  it('persists states and reloads them', () => {
+    const backend = memoryBackend()
+    initStore(backend)
+    setCell('ramp', '2026-02-09', 'LL')
+    setBidState('ramp', '2026-02-09', 'approved')
+    initStore(backend)
+    expect(getState().states.ramp['2026-02-09']).toBe('approved')
+  })
+
+  // States are seeded only alongside a seeded grid, so with no grid stored
+  // the states key is not consulted at all — whatever it holds. This pins
+  // the pairing rule, not the validator; the validator is exercised below,
+  // where a stored grid makes the states key actually load.
+  it('seeds the states when nothing usable is stored, whatever the states key holds', () => {
+    const backend = memoryBackend()
+    backend.write('states', 'not json')
+    initStore(backend)
+    expect(getState().states).toBeTypeOf('object')
+    expect(Array.isArray(getState().states)).toBe(false)
+    // Asserted against a seed-only value, same as the grid fallbacks above —
+    // a fallback to `{}` would otherwise pass this just as easily.
+    expect(getState().states.jaguar?.['2026-01-19']).toBe('refused')
+  })
+
+  // The last two shapes name a cell the stored grid really holds and really
+  // is a bid, so an accepted value would survive `reconcile` and land in
+  // `states` — that is what makes them bite instead of passing vacuously
+  // through the pruning, and they were rewritten to this form after the
+  // first draft was found to pass with the leaf check removed.
+  //
+  // `null` and `[]` are weaker on purpose and worth knowing as such: each is
+  // already caught before the leaf check (the try/catch, and pruning to an
+  // empty map respectively), so they pin the observable behaviour without
+  // isolating the plain-object guard. That guard is belt-and-braces here.
+  it.each([
+    ['null', 'null'],
+    ['an array', '[]'],
+    ['a leaf that is not a string', '{"jaguar":{"2026-01-19":123}}'],
+    ['a state string nobody defined', '{"jaguar":{"2026-01-19":"maybe"}}'],
+  ])('discards stored states that are %s, keeping the stored grid', (_label, raw) => {
+    const backend = memoryBackend()
+    backend.write('grid', '{"jaguar":{"2026-01-19":"OL"}}')
+    backend.write('states', raw)
+    initStore(backend)
+    expect(getState().grid.jaguar['2026-01-19']).toBe('OL')
+    expect(getState().states.jaguar?.['2026-01-19']).toBeUndefined()
+  })
+
+  it('keeps stored states that are well formed', () => {
+    const backend = memoryBackend()
+    backend.write('grid', '{"jaguar":{"2026-01-19":"OL"}}')
+    backend.write('states', '{"jaguar":{"2026-01-19":"refused"}}')
+    initStore(backend)
+    expect(getState().states.jaguar['2026-01-19']).toBe('refused')
+  })
+
+  // The parallel map's one weakness is drift, and load is where it can
+  // arrive from outside setCell — hand-edited storage, or data written by a
+  // build that predates states. A state whose cell no longer holds a code
+  // someone bid for is dropped rather than left to colour a cell that is
+  // now medical, or to remove a man who has no leave booked at all.
+  it('drops a stored state whose code has gone or is no longer a bid', () => {
+    const backend = memoryBackend()
+    backend.write('grid', JSON.stringify({ ramp: { '2026-01-05': 'M' } }))
+    backend.write('states', JSON.stringify({
+      ramp: { '2026-01-05': 'approved', '2026-01-06': 'approved' },
+    }))
+    initStore(backend)
+    expect(getState().states.ramp?.['2026-01-05']).toBeUndefined()
+    expect(getState().states.ramp?.['2026-01-06']).toBeUndefined()
+  })
+
+  // Seed decisions belong to the seed grid. Hanging them off a grid the user
+  // has already written would approve cells nobody bid for.
+  it('does not seed states over a stored grid', () => {
+    const backend = memoryBackend()
+    backend.write('grid', JSON.stringify({ jaguar: { '2026-01-19': 'OL' } }))
+    initStore(backend)
+    expect(getState().states.jaguar?.['2026-01-19']).toBeUndefined()
+  })
+})
+
+describe('advanceStage', () => {
+  it('walks the period forward one stage at a time', () => {
+    expect(getState().period.stage).toBe('open')
+    advanceStage()
+    expect(getState().period.stage).toBe('closed')
+    advanceStage()
+    expect(getState().period.stage).toBe('published')
+  })
+
+  it('stops at published rather than wrapping', () => {
+    advanceStage(); advanceStage(); advanceStage()
+    expect(getState().period.stage).toBe('published')
+  })
+
+  it('does not notify when there is nowhere further to go', () => {
+    advanceStage(); advanceStage()
+    const before = getVersion()
+    advanceStage()
+    expect(getVersion()).toBe(before)
+  })
+
+  it('persists the stage and reloads it', () => {
+    const backend = memoryBackend()
+    initStore(backend)
+    advanceStage()
+    initStore(backend)
+    expect(getState().period.stage).toBe('closed')
   })
 })

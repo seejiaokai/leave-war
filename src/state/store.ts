@@ -1,16 +1,22 @@
-// The store. `setCell` is the ONLY write path: it updates the grid, persists
-// through the backend, bumps the version and notifies. A write that skips it
-// is invisible to the interface and is never saved.
+// The store. `setCell` is the ONLY path that writes a cell: it updates the
+// grid AND that cell's bid state, persists through the backend, bumps the
+// version and notifies. A write that skips it is invisible to the interface
+// and is never saved.
 
 import {
+  isBiddable,
+  nextStage,
   seedGrid,
   seedPeople,
   seedPeriod,
   seedRequirements,
+  seedStates,
+  type BidState,
   type Grid,
   type Period,
   type Person,
   type Requirements,
+  type States,
 } from '../engine'
 import { localBackend, memoryBackend, type StorageBackend } from './storage'
 
@@ -19,6 +25,7 @@ interface State {
   period: Period
   requirements: Requirements
   grid: Grid
+  states: States
 }
 
 let backend: StorageBackend = memoryBackend()
@@ -32,6 +39,7 @@ function blank(): State {
     period: seedPeriod(),
     requirements: seedRequirements(),
     grid: seedGrid(),
+    states: seedStates(),
   }
 }
 
@@ -55,24 +63,72 @@ function isValidGrid(x: unknown): x is Grid {
   return true
 }
 
-function loadGrid(): Grid {
-  const raw = backend.read('grid')
-  if (!raw) return seedGrid()
-  try {
-    const parsed = JSON.parse(raw)
-    // Anything that is not a valid grid shape is unusable; the seed is a
-    // better answer than a crash on boot.
-    if (!isValidGrid(parsed)) return seedGrid()
-    return parsed
-  } catch {
-    return seedGrid()
+const BID_STATES = new Set(['pending', 'approved', 'refused'])
+
+// Same shape as a grid, but the leaves are one of three known strings rather
+// than free text. A state nobody defined is not a state — it would flow
+// straight into `removesAvailability`, where anything that is not exactly
+// 'refused' silently removes a person.
+function isValidStates(x: unknown): x is States {
+  if (!isPlainObject(x)) return false
+  for (const row of Object.values(x)) {
+    if (!isPlainObject(row)) return false
+    for (const s of Object.values(row)) {
+      if (typeof s !== 'string' || !BID_STATES.has(s)) return false
+    }
   }
+  return true
+}
+
+/** What the backend holds under `key`, or `null` if there is nothing usable
+ *  there. `null` covers both "never written" and "written but unreadable" —
+ *  the caller's answer to each is the same, which is to fall back. */
+function read<T>(key: string, valid: (x: unknown) => x is T): T | null {
+  const raw = backend.read(key)
+  if (!raw) return null
+  try {
+    const parsed: unknown = JSON.parse(raw)
+    return valid(parsed) ? parsed : null
+  } catch {
+    return null
+  }
+}
+
+// The parallel map's one real weakness is drift, and load is the one place
+// drift can arrive from outside `setCell` — hand-edited storage, or data
+// written by a build that predates bid states. So every stored state is
+// checked against the cell it names and dropped if that cell no longer
+// holds a code someone bids for: a stale 'approved' left on a cell that is
+// now medical would colour it wrong, and one left on an empty cell would
+// mean nothing at all.
+function reconcile(grid: Grid, states: States): States {
+  const out: States = {}
+  for (const [id, row] of Object.entries(states)) {
+    const kept: Record<string, BidState> = {}
+    for (const [date, s] of Object.entries(row)) {
+      if (isBiddable(grid[id]?.[date])) kept[date] = s
+    }
+    if (Object.keys(kept).length > 0) out[id] = kept
+  }
+  return out
 }
 
 export function initStore(b?: StorageBackend): void {
   backend = b ?? localBackend()
   state = blank()
-  state.grid = loadGrid()
+
+  const storedGrid = read('grid', isValidGrid)
+  state.grid = storedGrid ?? seedGrid()
+  // Seed decisions belong to the seed grid and to nothing else. A stored
+  // grid is the squadron's own data, and hanging seeded approvals off it
+  // would approve cells nobody bid for.
+  state.states = reconcile(state.grid, storedGrid ? read('states', isValidStates) ?? {} : seedStates())
+
+  const storedStage = backend.read('stage')
+  if (storedStage === 'draft' || storedStage === 'open' || storedStage === 'closed' || storedStage === 'published') {
+    state.period = { ...state.period, stage: storedStage }
+  }
+
   version = 0
   listeners.clear()
 }
@@ -95,13 +151,63 @@ function notify(): void {
   for (const fn of listeners) fn()
 }
 
+// One writer for all three keys, so no write path can save a grid and forget
+// the states that have to agree with it.
+function persist(): void {
+  backend.write('grid', JSON.stringify(state.grid))
+  backend.write('states', JSON.stringify(state.states))
+  backend.write('stage', state.period.stage)
+}
+
+// A cell and its bid state are written together. Splitting them across two
+// callers is how the two maps drift — a code with no state, or a state whose
+// code has gone. This is the only function allowed to write either.
 export function setCell(personId: string, date: string, code: string): void {
-  const row = { ...(state.grid[personId] ?? {}) }
   const clean = code.trim().toUpperCase()
+  const previous = state.grid[personId]?.[date]
+  const row = { ...(state.grid[personId] ?? {}) }
+  const srow = { ...(state.states[personId] ?? {}) }
+
   if (clean) row[date] = clean
   else delete row[date]
 
-  state = { ...state, grid: { ...state.grid, [personId]: row } }
-  backend.write('grid', JSON.stringify(state.grid))
+  if (!clean || !isBiddable(clean)) delete srow[date]
+  // A code rewritten as ITSELF keeps whatever decision it already carries —
+  // re-typing LL over an approved LL must not quietly un-approve it. A code
+  // rewritten as a DIFFERENT one is a different ask, so it goes back to
+  // pending: nobody approved a week overseas by approving a day of local
+  // leave.
+  else if (clean !== previous || srow[date] === undefined) srow[date] = 'pending'
+
+  state = {
+    ...state,
+    grid: { ...state.grid, [personId]: row },
+    states: { ...state.states, [personId]: srow },
+  }
+  persist()
+  notify()
+}
+
+/** Record a decision on a bid. Deliberately not role-gated: there is no
+ *  login in this prototype, so anyone can decide anything — see
+ *  `docs/known-gaps.md`. */
+export function setBidState(personId: string, date: string, bid: BidState): void {
+  // A decision on a cell nobody bid for would be a state with no bid behind
+  // it, which is exactly the drift `setCell` exists to prevent. Ignore it
+  // rather than write it.
+  if (!isBiddable(state.grid[personId]?.[date])) return
+  const srow = { ...(state.states[personId] ?? {}), [date]: bid }
+  state = { ...state, states: { ...state.states, [personId]: srow } }
+  persist()
+  notify()
+}
+
+/** Walk the period to its next stage. Forward only, and a no-op at the end
+ *  of the cycle — `nextStage` owns which transitions exist. */
+export function advanceStage(): void {
+  const next = nextStage(state.period.stage)
+  if (!next) return
+  state = { ...state, period: { ...state.period, stage: next } }
+  persist()
   notify()
 }
