@@ -1000,7 +1000,21 @@ them becomes ambiguous and stops being exported from the barrel at all.
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `npx vitest run src/engine/availability.test.ts`
-Expected: PASS, 13 tests.
+Expected: PASS, 16 tests.
+
+Three of those go beyond the cases listed above, and they are the ones that
+matter most, because the listed set does not actually pin the logic:
+
+- A `sets` case where **pilots** are the constraining seat. Every case above
+  leaves WSOs equal-or-lesser, so a regression to `sets: wsos` — dropping
+  pilots from the calculation entirely — passes all of them.
+- A **posted-out person carrying `FS` on a date after their `to`**, asserting
+  they stay out of the `duty` tally. Nothing above exercises that guard.
+- `HS` reaching the `duty` tally through `countsFor`, and `PM` exercised at
+  all.
+
+Prove the first two by making the exact break each one guards and watching it
+go red before trusting it.
 
 - [ ] **Step 5: Commit**
 
