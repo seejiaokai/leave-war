@@ -116,10 +116,77 @@ test('the matrix stays within a sane DOM size', async ({ page }) => {
   // nodes, measured 2026-08-09 — still comfortably under the ceiling, which
   // stays at 2500 (headroom, not a target): raising it is a deliberate edit
   // in the PR that adds the nodes.
+  //
+  // The bidding plan left this figure untouched at 2330, measured again on
+  // 2026-08-09: the bid sheet renders OUTSIDE the table, so `.mx *` cannot
+  // see it. That is this selector's blind spot rather than a saving, which
+  // is why the second half of this test counts the whole document with the
+  // sheet open — a sheet that grew without bound would otherwise never
+  // trouble the ceiling at all.
   const nodes = await page.evaluate(() => document.querySelectorAll('.mx *').length)
   // A missing `.mx` would make this 0, which is comfortably "less than the
   // ceiling" — assert it's also nonzero so an absent grid fails loudly
   // instead of passing by accident.
   expect(nodes).toBeGreaterThan(0)
   expect(nodes).toBeLessThan(2500)
+
+  await page.locator('[data-testid="cell-dusk-2026-02-11"]').click()
+  await expect(page.locator('[data-testid="bid-picker"]')).toBeVisible()
+  // 2384 whole-document nodes with the sheet open, measured 2026-08-09
+  // (2330 of them the matrix). Ceiling 2600 on the same headroom principle.
+  const all = await page.evaluate(() => document.querySelectorAll('*').length)
+  expect(all).toBeGreaterThan(nodes)
+  expect(all).toBeLessThan(2600)
+})
+
+test('the three bid states are three distinguishable colours', async ({ page }) => {
+  const bg = (sel: string) => page.locator(sel).evaluate(el => getComputedStyle(el).backgroundColor)
+  const appr = await bg('[data-testid="cell-jaguar-2026-01-16"] .c')
+  const tbc = await bg('[data-testid="cell-asics-2026-01-23"] .c')
+  const ref = await bg('[data-testid="cell-jaguar-2026-01-19"] .c')
+  expect(new Set([appr, tbc, ref]).size).toBe(3)
+  for (const c of [appr, tbc, ref]) expect(c).not.toBe('rgba(0, 0, 0, 0)')
+})
+
+test('a bid can be placed and shows as pending', async ({ page }) => {
+  await page.locator('[data-testid="cell-dusk-2026-02-11"]').click()
+  await page.locator('[data-testid="bid-LL"]').click()
+  const cls = await page.locator('[data-testid="cell-dusk-2026-02-11"] .c').getAttribute('class')
+  expect(cls).toContain('tbc')
+})
+
+// The reason the bid sheet is a fixed-position sheet rather than a popover
+// inside the cell: `.mx-wrap` is an `overflow: auto` scroller, and anything
+// positioned inside a 30px-wide cell is clipped by it. jsdom applies no
+// layout at all, so the unit tests can prove the sheet was rendered and
+// nothing whatever about whether it can be seen. Only a real browser can.
+test('the bid sheet is visible in full, not clipped by the grid scroller', async ({ page }) => {
+  await page.locator('[data-testid="cell-dusk-2026-02-11"]').click()
+  const sheet = page.locator('[data-testid="bid-picker"]')
+  await expect(sheet).toBeVisible()
+
+  const box = (await sheet.boundingBox())!
+  expect(box.width).toBeGreaterThan(0)
+  expect(box.height).toBeGreaterThan(0)
+
+  const view = page.viewportSize()!
+  expect(box.x).toBeGreaterThanOrEqual(0)
+  expect(box.y).toBeGreaterThanOrEqual(0)
+  expect(box.x + box.width).toBeLessThanOrEqual(view.width + 1)
+  expect(box.y + box.height).toBeLessThanOrEqual(view.height + 1)
+
+  // Its buttons have to be reachable, not merely laid out — a sheet the
+  // scroller clipped would still report a box while sitting under the grid.
+  await expect(page.locator('[data-testid="bid-LL"]')).toBeVisible()
+  await page.locator('[data-testid="bid-LL"]').click()
+  await expect(sheet).toBeHidden()
+})
+
+test('opening the bid sheet never makes the page scroll sideways', async ({ page }) => {
+  await page.locator('[data-testid="cell-dusk-2026-02-11"]').click()
+  await expect(page.locator('[data-testid="bid-picker"]')).toBeVisible()
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+  )
+  expect(overflow).toBeLessThanOrEqual(1)
 })
