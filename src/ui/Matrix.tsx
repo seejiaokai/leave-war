@@ -1,4 +1,13 @@
-import { categoryOf, evaluatePeriod, inSquadron, isDuty, isWeekend, parseCell } from '../engine'
+import {
+  categoryOf,
+  evaluatePeriod,
+  inSquadron,
+  isBiddable,
+  isDuty,
+  isWeekend,
+  parseCell,
+  stateOf,
+} from '../engine'
 import { getState } from '../state/store'
 import { CountRows } from './CountRows'
 import { useVersion } from './useStore'
@@ -16,11 +25,9 @@ function monthLabel(date: string): string | null {
 
 export function Matrix() {
   useVersion()
-  const { people, period, grid, requirements } = getState()
+  const { people, period, grid, states, requirements } = getState()
   const dates = period.days.map(d => d.date)
-  // `{}` for the bid states until the store carries them — see the bidding
-  // plan, Task 4. Replaced there, not left as a permanent empty map.
-  const verdicts = evaluatePeriod(people, grid, {}, requirements, dates)
+  const verdicts = evaluatePeriod(people, grid, states, requirements, dates)
 
   return (
     <div className="stage">
@@ -78,11 +85,26 @@ export function Matrix() {
                       isWeekend(d.date) ? 'weekend' : '',
                     ].filter(Boolean).join(' ')
                     const text = here ? code : notYetArrived ? '' : 'PO'
-                    // Only `.sc` (duty) and `.info` (everything else with a
-                    // real code) are ever produced — bid states (appr/tbc/
-                    // ref) arrive with a later plan. A bare "PO" chip on a
-                    // posted-out cell carries no state class.
-                    const chipState = here && code ? (isDuty(code) ? 'sc' : 'info') : ''
+                    // Duty first for the reader — FS/HS are work, not a bid.
+                    // (They carry `bid: false`, so they could not reach a
+                    // bid branch anyway; the order is legibility, not a
+                    // guard.) Then the bid state, but only where the code is
+                    // one a person bids for. Everything else is plain
+                    // information:
+                    // medical, a course, overseas duty. A bare "PO" chip on
+                    // a posted-out cell carries no state class at all.
+                    //
+                    // A bid with NO decision recorded reads as pending: the
+                    // squadron has asked and nobody has answered, which is
+                    // what "to be confirmed" means.
+                    const bid = stateOf(states, p.id, d.date)
+                    const chipState = !here || !code
+                      ? ''
+                      : isDuty(code) ? 'sc'
+                      : !isBiddable(code) ? 'info'
+                      : bid === 'approved' ? 'appr'
+                      : bid === 'refused' ? 'ref'
+                      : 'tbc'
                     // The half-day fill is read off the stored string via
                     // `parseCell`, never kept as its own bit of state and
                     // never guessed by matching an asterisk here in the

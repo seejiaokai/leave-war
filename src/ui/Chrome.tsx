@@ -3,18 +3,10 @@
 // yet (My leave, Ledger, Rules, Roster) and no "closes in N days", which
 // the engine does not model. See CLAUDE-facing restyle brief for why.
 
-import type { Stage } from '../engine'
-import { evaluatePeriod } from '../engine'
+import { evaluatePeriod, stageLabel } from '../engine'
 import { getState } from '../state/store'
 import { useVersion } from './useStore'
 import './chrome.css'
-
-const STAGE_LABEL: Record<Stage, string> = {
-  draft: 'DRAFT',
-  open: 'OPEN FOR BIDDING',
-  closed: 'CLOSED',
-  published: 'PUBLISHED',
-}
 
 export function Topbar() {
   useVersion()
@@ -43,25 +35,28 @@ export function Topbar() {
 
 export function StageBar() {
   useVersion()
-  const { people, period, grid, requirements } = getState()
+  const { people, period, grid, states, requirements } = getState()
   const dates = period.days.map(d => d.date)
   // Duplicates the same evaluatePeriod call Matrix makes internally. Both
   // stay self-contained (no prop plumbing between them) so Matrix keeps
   // rendering standalone in its existing tests; the cost is one extra pass
-  // over a 90-day period, which is not worth threading props for.
-  // `{}` for the bid states until the store carries them — see the bidding
-  // plan, Task 4. Replaced there, not left as a permanent empty map.
-  const verdicts = evaluatePeriod(people, grid, {}, requirements, dates)
+  // over a 90-day period, which is not worth threading props for. Both must
+  // be handed the same `states`, or the strip counts a different squadron
+  // from the one the grid below it is painting.
+  const verdicts = evaluatePeriod(people, grid, states, requirements, dates)
   const redDays = dates.filter(d => verdicts[d].verdict === 'red').length
 
   return (
     <div className="filters">
       <span className="lab">Stage</span>
-      <span className={`fchip${period.stage === 'open' ? ' stage-open' : ''}`}>
-        {STAGE_LABEL[period.stage]}
+      <span
+        className={`fchip${period.stage === 'open' ? ' stage-open' : ''}`}
+        data-testid="stage-now"
+      >
+        {stageLabel(period.stage)}
       </span>
       <span className="lab" style={{ marginLeft: 12 }}>Under-manned</span>
-      <span className={`fchip${redDays > 0 ? ' undermanned' : ''}`}>
+      <span className={`fchip${redDays > 0 ? ' undermanned' : ''}`} data-testid="undermanned">
         {redDays} day{redDays === 1 ? '' : 's'}
       </span>
     </div>

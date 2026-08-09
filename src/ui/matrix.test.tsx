@@ -1,7 +1,7 @@
-import { render, screen, within } from '@testing-library/react'
+import { act, render, screen, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it } from 'vitest'
 import type { Person } from '../engine'
-import { getState, initStore, setCell } from '../state/store'
+import { getState, initStore, setBidState, setCell } from '../state/store'
 import { memoryBackend } from '../state/storage'
 import { Matrix } from './Matrix'
 
@@ -103,14 +103,17 @@ describe('Matrix', () => {
     expect(feb1.querySelector('.mon')?.textContent).toBe('FEB')
   })
 
-  it('gives a duty cell the sc chip class and an ordinary code the info chip class', () => {
+  it('gives a duty cell the sc chip class and a non-bid code the info chip class', () => {
     render(<Matrix />)
-    // Seed: TATA is on FS (a duty code) on 1 Jan, and on OIL (an ordinary
-    // code) on 9 Jan.
+    // Seed: TATA is on FS (a duty code) on 1 Jan; SPLICE is on M (medical)
+    // on 5 Jan. This asserted TATA's OIL on 9 Jan as the `.info` case until
+    // bid states landed — OIL is leave someone asked for, so it now carries
+    // a bid colour instead. `.info` is what remains: the codes nobody bids
+    // for, which is medical, courses and overseas duty.
     const dutyCell = screen.getByTestId('cell-tata-2026-01-01')
     expect(dutyCell.querySelector('.c.sc')?.textContent).toBe('FS')
-    const ordinaryCell = screen.getByTestId('cell-tata-2026-01-09')
-    expect(ordinaryCell.querySelector('.c.info')?.textContent).toBe('OIL')
+    const ordinaryCell = screen.getByTestId('cell-splice-2026-01-05')
+    expect(ordinaryCell.querySelector('.c.info')?.textContent).toBe('M')
   })
 
   it('carries the am/pm portion class on the chip, derived from the stored asterisk', () => {
@@ -155,5 +158,61 @@ describe('weekend banding', () => {
     expect(screen.getByTestId('cell-ramp-2026-01-03').className).toContain('weekend')
     expect(screen.getByTestId('head-2026-01-06').className).not.toContain('weekend')
     expect(screen.getByTestId('cell-ramp-2026-01-06').className).not.toContain('weekend')
+  })
+})
+
+describe('bid state on a cell', () => {
+  it('paints an approved bid green, a pending one purple, a refused one red', () => {
+    render(<Matrix />)
+    expect(screen.getByTestId('cell-jaguar-2026-01-16').querySelector('.c')!.className).toContain('appr')
+    expect(screen.getByTestId('cell-asics-2026-01-23').querySelector('.c')!.className).toContain('tbc')
+    expect(screen.getByTestId('cell-jaguar-2026-01-19').querySelector('.c')!.className).toContain('ref')
+  })
+
+  it('leaves a code nobody bids for as plain information', () => {
+    render(<Matrix />)
+    expect(screen.getByTestId('cell-tata-2026-01-01').querySelector('.c')!.className).toContain('sc')
+    expect(screen.getByTestId('cell-pipper-2026-01-12').querySelector('.c')!.className).toContain('info')
+  })
+
+  // Neither duty nor medical may ever take a bid colour: one is a man at
+  // work, the other is a man who did not ask for anything. Both are pinned
+  // against every bid class rather than just for their own, so a cascade
+  // that added `tbc` alongside `sc` would fail here.
+  //
+  // This does NOT prove the branch ORDER in Matrix.tsx — duty codes carry
+  // `bid: false`, so `isDuty` and `isBiddable` are disjoint and reordering
+  // them changes nothing. Reading duty first is for the reader, not a guard.
+  it('never lets duty or medical take a bid colour', () => {
+    render(<Matrix />)
+    for (const [id, cls] of [['cell-skin-2026-01-03', 'sc'], ['cell-splice-2026-01-05', 'info']] as const) {
+      const name = screen.getByTestId(id).querySelector('.c')!.className
+      expect(name).toContain(cls)
+      for (const bidClass of ['appr', 'tbc', 'ref']) expect(name).not.toContain(bidClass)
+    }
+  })
+
+  // A bid with no decision recorded is pending — the seed leaves splice's
+  // LL unstated precisely so this path renders on first run.
+  it('reads a bid with no decision recorded as pending', () => {
+    render(<Matrix />)
+    expect(screen.getByTestId('cell-splice-2026-01-08').querySelector('.c')!.className).toContain('tbc')
+  })
+
+  it('re-paints when a decision is recorded', () => {
+    render(<Matrix />)
+    expect(screen.getByTestId('cell-asics-2026-01-23').querySelector('.c')!.className).toContain('tbc')
+    act(() => setBidState('asics', '2026-01-23', 'approved'))
+    expect(screen.getByTestId('cell-asics-2026-01-23').querySelector('.c')!.className).toContain('appr')
+  })
+
+  // The counts are what a refusal is FOR: pulling a man back into the
+  // manning picture. A Matrix that painted the chip but still passed `{}`
+  // for the states would pass every assertion above and fail this one.
+  it('counts a refused bid as a man at work', () => {
+    render(<Matrix />)
+    const before = screen.getByTestId('count-opsp-2026-01-23').textContent
+    act(() => setBidState('asics', '2026-01-23', 'refused'))
+    expect(screen.getByTestId('count-opsp-2026-01-23').textContent).not.toBe(before)
   })
 })
