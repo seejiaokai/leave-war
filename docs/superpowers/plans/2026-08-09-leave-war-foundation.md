@@ -142,6 +142,13 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     include: ['src/**/*.test.{ts,tsx}'],
+    // Run the whole suite somewhere local time and UTC genuinely disagree.
+    // On a UTC machine — this container, and most CI runners — a date routine
+    // written with local accessors behaves identically to a correct one, so
+    // the tests that exist to catch that mistake cannot catch it. Pacific/
+    // Midway is UTC-11, so a UTC Saturday is a local Friday and the two
+    // readings diverge.
+    env: { TZ: 'Pacific/Midway' },
   },
 })
 ```
@@ -553,6 +560,16 @@ describe('isWeekend', () => {
   it('does not call a weekday a weekend', () => {
     expect(isWeekend('2026-01-02')).toBe(false)
     expect(isWeekend('2026-01-05')).toBe(false)
+  })
+
+  // The guard the rest of this file cannot provide. Under Pacific/Midway
+  // (UTC-11, set in vite.config.ts) 2026-01-03 is a Saturday in UTC and a
+  // Friday locally, so this assertion is impossible to pass with `getDay()`
+  // in place of `getUTCDay()`. Prove it by making that swap and watching this
+  // go red before trusting it.
+  it('uses the UTC weekday, not the local one', () => {
+    expect(isWeekend('2026-01-03')).toBe(true)
+    expect(new Date(Date.UTC(2026, 0, 3)).getDay()).not.toBe(6)
   })
 })
 
