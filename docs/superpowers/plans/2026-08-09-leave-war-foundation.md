@@ -1449,7 +1449,17 @@ export * from './seed'
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `npx vitest run src/engine/seed.test.ts`
-Expected: PASS, 6 tests.
+Expected: PASS, 8 tests.
+
+Two of those go beyond the cases above and matter more than any of them,
+because this is the one place a typo raises nothing at all: an unknown grid id
+is simply never looked up, and an unknown code makes `codeOf` return
+`undefined`, which `availabilityOf` deliberately treats as *fully available*.
+So pin both — every id key in `seedGrid()` resolves to a person in
+`seedPeople()`, and every code value resolves through `codeOf` — and make each
+failure name the offending id or code, since a bare boolean tells whoever
+breaks it nothing. Prove both by planting a bad id and a bad code and watching
+them go red.
 
 - [ ] **Step 5: Commit**
 
