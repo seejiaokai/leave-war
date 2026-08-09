@@ -3,10 +3,119 @@
 // what a piece of text in a cell means.
 //
 // The spreadsheet this replaces had no such table: its availability counts
-// tested for an EMPTY cell, so `AM` removed a whole person and so did SC duty,
-// which is someone at work. `removes` and `duty` exist to end both of those.
+// tested for an EMPTY cell, so a half day removed a whole person and so did
+// SC duty, which is someone at work. `removes` and `duty` exist to end both
+// of those.
+//
+// A cell is a LEAVE TYPE plus a PORTION, or a NON-LEAVE MARKER. `AM` and `PM`
+// were never codes of their own — treating them as if they were is exactly
+// the bug this rework fixes: a portion is something ANY leave type can
+// carry, not a leave type in itself. The owner's own notation says where the
+// portion goes: `OIL` is a whole day, `*OIL` is the morning, `OIL*` is the
+// afternoon. The asterisk sits where the time sits, and that notation — not
+// an abbreviation like the old `HO` — is what is stored, typed and read back
+// from a CSV.
 
 export type CounterName = 'annual' | 'oil' | 'ccl' | 'pcl' | 'pl' | 'el' | 'fcl'
+
+export type Portion = 'full' | 'am' | 'pm'
+
+/** A parsed cell: what the person is doing, and how much of the day it takes. */
+export interface Cell {
+  type: string
+  portion: Portion
+}
+
+export interface LeaveType {
+  type: string
+  label: string
+  counter: CounterName
+}
+
+// The eight leave types. All are biddable and all spend a counter — that is
+// what makes them leave rather than a marker. Exported so a future bid
+// picker can list them without duplicating this table.
+export const LEAVE_TYPES: LeaveType[] = [
+  { type: 'LL', label: 'local leave', counter: 'annual' },
+  { type: 'OL', label: 'overseas leave', counter: 'annual' },
+  { type: 'OIL', label: 'off in lieu', counter: 'oil' },
+  { type: 'CCL', label: 'child care leave', counter: 'ccl' },
+  { type: 'PCL', label: 'parentcare leave', counter: 'pcl' },
+  { type: 'PL', label: 'paternity leave', counter: 'pl' },
+  { type: 'EL', label: 'embarkation leave', counter: 'el' },
+  { type: 'FCL', label: 'FCL', counter: 'fcl' },
+]
+
+const LEAVE_TYPE_BY_CODE: Record<string, LeaveType> = Object.fromEntries(
+  LEAVE_TYPES.map(t => [t.type, t]),
+)
+
+// Non-leave markers remove the whole day and spend nothing — they are not
+// bid for, so there is no counter to draw down. `HL` is deliberately absent:
+// the owner's legend reads "M - Medical (HL/ATT C)", meaning HL is a REASON
+// a day is coded M, not a code of its own. Coding it separately was this
+// author's unverified guess, now corrected.
+const NON_LEAVE_LABELS: Record<string, string> = {
+  M: 'medical (HL/ATT C)',
+  CSE: 'course',
+  OD: 'overseas duty',
+}
+
+// SC duty: at work, but off the flying programme. This is a different axis
+// from leave entirely — the codes arrive from Raptor's schedule rather than
+// being typed here — so they stay literal two-letter markers rather than
+// being folded into the type-plus-portion model. They never carry a
+// portion; `earnsOil` is the only place "half" appears for these two.
+const SC_DUTY_LABELS: Record<string, string> = {
+  FS: 'full day SC duty',
+  HS: 'half day SC duty',
+}
+const SC_DUTY_EARNS: Record<string, 0.5 | 1> = { FS: 1, HS: 0.5 }
+
+/** full costs a whole day, am/pm cost half — the only two amounts a cell ever removes. */
+export function portionAmount(portion: Portion): number {
+  return portion === 'full' ? 1 : 0.5
+}
+
+/**
+ * Parse the stored notation into a `Cell`, or `null` if it is not one.
+ *
+ * Two shapes are rejected on purpose, both because letting them through
+ * would corrupt a leave balance silently instead of failing loudly on
+ * screen:
+ * - an asterisk on BOTH sides (`*LL*`) — the notation only ever carries one
+ *   time marker, so this is not "a valid portion", it is malformed input.
+ * - an asterisk on a NON-LEAVE marker (`*M`, `CSE*`, `*FS`) — only leave
+ *   types take a portion; medical, courses and SC duty do not come in
+ *   halves in this squadron's vocabulary.
+ */
+export function parseCell(raw: string | undefined | null): Cell | null {
+  if (!raw) return null
+  const trimmed = raw.trim().toUpperCase()
+  if (!trimmed) return null
+
+  const leadingStar = trimmed.startsWith('*')
+  const trailingStar = trimmed.endsWith('*')
+  if (leadingStar && trailingStar) return null
+
+  const portion: Portion = leadingStar ? 'am' : trailingStar ? 'pm' : 'full'
+  const type = trimmed.slice(leadingStar ? 1 : 0, trailingStar ? -1 : undefined)
+  if (!type) return null
+
+  if (portion !== 'full') {
+    return LEAVE_TYPE_BY_CODE[type] ? { type, portion } : null
+  }
+
+  const known = LEAVE_TYPE_BY_CODE[type] || NON_LEAVE_LABELS[type] || SC_DUTY_LABELS[type]
+  return known ? { type, portion: 'full' } : null
+}
+
+/** The canonical notation for a cell — the asterisk sits where the time sits. */
+export function formatCell(cell: Cell): string {
+  if (cell.portion === 'am') return `*${cell.type}`
+  if (cell.portion === 'pm') return `${cell.type}*`
+  return cell.type
+}
 
 export interface DayCode {
   code: string
@@ -23,49 +132,50 @@ export interface DayCode {
   duty: boolean
 }
 
-const def = (
-  code: string,
-  label: string,
-  removes: 0 | 0.5 | 1,
-  spends: { counter: CounterName; amount: number } | null,
-  opts: { earnsOil?: 0 | 0.5 | 1; bid?: boolean; duty?: boolean } = {},
-): DayCode => ({
-  code,
-  label,
-  removes,
-  spends,
-  earnsOil: opts.earnsOil ?? 0,
-  bid: opts.bid ?? true,
-  duty: opts.duty ?? false,
-})
+// Everything below derives a `DayCode` from a parsed `Cell` rather than
+// having one hand-written per row, which is what let `AM`/`PM`/`HO` sneak in
+// as if they were codes of their own rather than a leave type's portion.
+function dayCodeFor(cell: Cell): DayCode {
+  const { type, portion } = cell
 
-export const CODES: Record<string, DayCode> = {
-  LL: def('LL', 'local leave', 1, { counter: 'annual', amount: 1 }),
-  AM: def('AM', 'half day leave (morning)', 0.5, { counter: 'annual', amount: 0.5 }),
-  PM: def('PM', 'half day leave (afternoon)', 0.5, { counter: 'annual', amount: 0.5 }),
-  OL: def('OL', 'overseas leave', 1, { counter: 'annual', amount: 1 }),
-  OIL: def('OIL', 'full OIL', 1, { counter: 'oil', amount: 1 }),
-  HO: def('HO', 'half OIL', 0.5, { counter: 'oil', amount: 0.5 }),
-  CCL: def('CCL', 'child care leave', 1, { counter: 'ccl', amount: 1 }),
-  PCL: def('PCL', 'parentcare leave', 1, { counter: 'pcl', amount: 1 }),
-  PL: def('PL', 'paternity leave', 1, { counter: 'pl', amount: 1 }),
-  EL: def('EL', 'embarkation leave', 1, { counter: 'el', amount: 1 }),
-  FCL: def('FCL', 'FCL', 1, { counter: 'fcl', amount: 1 }),
-  M: def('M', 'medical (HL/ATT C)', 1, null, { bid: false }),
-  HL: def('HL', 'hospitalisation leave', 1, null, { bid: false }),
-  CSE: def('CSE', 'course', 1, null, { bid: false }),
-  OD: def('OD', 'overseas duty', 1, null, { bid: false }),
-  // removes is 1 here even though availabilityOf never reads it for these two
-  // (the `c.duty` branch short-circuits first) — the catalogue is the single
-  // source of truth for what a code means, and FS/HS genuinely remove the
-  // whole person from flying for the day.
-  FS: def('FS', 'full day SC duty', 1, null, { earnsOil: 1, bid: false, duty: true }),
-  HS: def('HS', 'half day SC duty', 1, null, { earnsOil: 0.5, bid: false, duty: true }),
+  const leave = LEAVE_TYPE_BY_CODE[type]
+  if (leave) {
+    const amount = portionAmount(portion)
+    const suffix = portion === 'am' ? ' (morning)' : portion === 'pm' ? ' (afternoon)' : ''
+    return {
+      code: formatCell(cell),
+      label: `${leave.label}${suffix}`,
+      removes: amount as 0 | 0.5 | 1,
+      spends: { counter: leave.counter, amount },
+      earnsOil: 0,
+      bid: true,
+      duty: false,
+    }
+  }
+
+  const nonLeaveLabel = NON_LEAVE_LABELS[type]
+  if (nonLeaveLabel) {
+    return { code: type, label: nonLeaveLabel, removes: 1, spends: null, earnsOil: 0, bid: false, duty: false }
+  }
+
+  // Only FS/HS remain, guaranteed by parseCell already having rejected
+  // anything else. SC duty removes nobody from flying by itself — `duty:
+  // true` is what excludes them, on their own line, rather than `removes`
+  // hiding them inside the leave shortfall the way the old sheet did.
+  return {
+    code: type,
+    label: SC_DUTY_LABELS[type],
+    removes: 0,
+    spends: null,
+    earnsOil: SC_DUTY_EARNS[type],
+    bid: false,
+    duty: true,
+  }
 }
 
 export function codeOf(code: string | undefined | null): DayCode | undefined {
-  if (!code) return undefined
-  return CODES[code.trim().toUpperCase()]
+  const cell = parseCell(code)
+  return cell ? dayCodeFor(cell) : undefined
 }
 
 export function isDuty(code: string | undefined | null): boolean {

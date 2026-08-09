@@ -1,23 +1,139 @@
 import { describe, expect, it } from 'vitest'
-import { CODES, codeOf, isDuty } from './codes'
+import { codeOf, formatCell, isDuty, parseCell, portionAmount } from './codes'
 
-describe('day codes', () => {
+describe('portionAmount', () => {
+  it('costs a whole day for full, half a day for am or pm', () => {
+    expect(portionAmount('full')).toBe(1)
+    expect(portionAmount('am')).toBe(0.5)
+    expect(portionAmount('pm')).toBe(0.5)
+  })
+})
+
+describe('parseCell', () => {
+  it('parses a bare leave type as a full day', () => {
+    expect(parseCell('LL')).toEqual({ type: 'LL', portion: 'full' })
+    expect(parseCell('OIL')).toEqual({ type: 'OIL', portion: 'full' })
+  })
+
+  it('parses a leading asterisk as the morning', () => {
+    expect(parseCell('*LL')).toEqual({ type: 'LL', portion: 'am' })
+    expect(parseCell('*OIL')).toEqual({ type: 'OIL', portion: 'am' })
+  })
+
+  it('parses a trailing asterisk as the afternoon', () => {
+    expect(parseCell('LL*')).toEqual({ type: 'LL', portion: 'pm' })
+    expect(parseCell('OIL*')).toEqual({ type: 'OIL', portion: 'pm' })
+  })
+
+  it('parses every leave type', () => {
+    for (const type of ['LL', 'OL', 'OIL', 'CCL', 'PCL', 'PL', 'EL', 'FCL']) {
+      expect(parseCell(type)).toEqual({ type, portion: 'full' })
+    }
+  })
+
+  it('parses a non-leave marker as a full day with no meaningful portion', () => {
+    for (const type of ['M', 'CSE', 'OD']) {
+      expect(parseCell(type)).toEqual({ type, portion: 'full' })
+    }
+  })
+
+  it('parses SC duty markers the same way, since they carry no portion either', () => {
+    expect(parseCell('FS')).toEqual({ type: 'FS', portion: 'full' })
+    expect(parseCell('HS')).toEqual({ type: 'HS', portion: 'full' })
+  })
+
+  it('is tolerant of surrounding whitespace and of case', () => {
+    expect(parseCell(' ll ')).toEqual({ type: 'LL', portion: 'full' })
+    expect(parseCell(' *ll ')).toEqual({ type: 'LL', portion: 'am' })
+    expect(parseCell(' ll* ')).toEqual({ type: 'LL', portion: 'pm' })
+  })
+
+  it('rejects an asterisk on both sides, since the notation only ever carries one time marker', () => {
+    expect(parseCell('*LL*')).toBeNull()
+    expect(parseCell('*OIL*')).toBeNull()
+  })
+
+  it('rejects a portion on a non-leave marker — only leave types come in halves', () => {
+    expect(parseCell('*M')).toBeNull()
+    expect(parseCell('CSE*')).toBeNull()
+    expect(parseCell('*OD')).toBeNull()
+  })
+
+  it('rejects a portion on an SC duty marker', () => {
+    expect(parseCell('*FS')).toBeNull()
+    expect(parseCell('HS*')).toBeNull()
+  })
+
+  it('rejects an unknown type', () => {
+    expect(parseCell('NOPE')).toBeNull()
+    expect(parseCell('*NOPE')).toBeNull()
+  })
+
+  it('rejects empty, whitespace-only or missing input', () => {
+    expect(parseCell('')).toBeNull()
+    expect(parseCell('   ')).toBeNull()
+    expect(parseCell(undefined)).toBeNull()
+    expect(parseCell(null)).toBeNull()
+  })
+
+  it('has no PO code — posted out is a roster date, not a code', () => {
+    expect(parseCell('PO')).toBeNull()
+  })
+
+  it('has no standalone AM, PM or HO code — a portion belongs to a leave type, not on its own', () => {
+    expect(parseCell('AM')).toBeNull()
+    expect(parseCell('PM')).toBeNull()
+    expect(parseCell('HO')).toBeNull()
+  })
+
+  it('has no HL code — the owner\'s legend makes HL a reason M is used, not a code of its own', () => {
+    expect(parseCell('HL')).toBeNull()
+  })
+})
+
+describe('formatCell', () => {
+  it('round-trips a full day back to the bare type', () => {
+    const cell = { type: 'LL', portion: 'full' } as const
+    expect(formatCell(cell)).toBe('LL')
+    expect(parseCell(formatCell(cell))).toEqual(cell)
+  })
+
+  it('round-trips a morning portion with a leading asterisk', () => {
+    const cell = { type: 'OIL', portion: 'am' } as const
+    expect(formatCell(cell)).toBe('*OIL')
+    expect(parseCell(formatCell(cell))).toEqual(cell)
+  })
+
+  it('round-trips an afternoon portion with a trailing asterisk', () => {
+    const cell = { type: 'OIL', portion: 'pm' } as const
+    expect(formatCell(cell)).toBe('OIL*')
+    expect(parseCell(formatCell(cell))).toEqual(cell)
+  })
+
+  it('round-trips a non-leave marker unchanged', () => {
+    const cell = { type: 'FS', portion: 'full' } as const
+    expect(formatCell(cell)).toBe('FS')
+    expect(parseCell(formatCell(cell))).toEqual(cell)
+  })
+})
+
+describe('codeOf', () => {
   it('makes a half day cost half a person, not a whole one', () => {
-    expect(codeOf('AM')!.removes).toBe(0.5)
-    expect(codeOf('PM')!.removes).toBe(0.5)
-    expect(codeOf('HO')!.removes).toBe(0.5)
+    expect(codeOf('*LL')!.removes).toBe(0.5)
+    expect(codeOf('LL*')!.removes).toBe(0.5)
+    expect(codeOf('*OIL')!.removes).toBe(0.5)
     expect(codeOf('LL')!.removes).toBe(1)
   })
 
-  it('spends the right counter', () => {
+  it('spends the right counter, scaled by the portion', () => {
     expect(codeOf('LL')!.spends).toEqual({ counter: 'annual', amount: 1 })
-    expect(codeOf('AM')!.spends).toEqual({ counter: 'annual', amount: 0.5 })
-    expect(codeOf('HO')!.spends).toEqual({ counter: 'oil', amount: 0.5 })
+    expect(codeOf('*LL')!.spends).toEqual({ counter: 'annual', amount: 0.5 })
+    expect(codeOf('*OIL')!.spends).toEqual({ counter: 'oil', amount: 0.5 })
     expect(codeOf('EL')!.spends).toEqual({ counter: 'el', amount: 1 })
   })
 
   it('spends nothing for medical, courses and overseas duty', () => {
-    for (const c of ['M', 'HL', 'CSE', 'OD']) expect(codeOf(c)!.spends).toBeNull()
+    for (const c of ['M', 'CSE', 'OD']) expect(codeOf(c)!.spends).toBeNull()
   })
 
   it('earns OIL only for SC duty', () => {
@@ -34,17 +150,18 @@ describe('day codes', () => {
     expect(codeOf('LL')!.bid).toBe(true)
   })
 
-  it('removes the whole person for SC duty even though duty short-circuits availability first', () => {
-    // availabilityOf never reads `removes` for FS/HS (it returns on `c.duty`
-    // before getting there), but the catalogue is the single source of truth
-    // for what a code means, and a later consumer reading `removes` alone
-    // must not conclude an SC-duty member is available.
-    expect(codeOf('FS')!.removes).toBe(1)
-    expect(codeOf('HS')!.removes).toBe(1)
+  it('removes nobody for SC duty by itself — `duty` is what excludes them, not `removes`', () => {
+    // availabilityOf returns on the `c.duty` branch before ever reading
+    // `removes` for FS/HS, and the catalogue now says plainly what that
+    // branch already assumes: SC duty removes 0 on its own account. Someone
+    // on SC duty is at work, not absent — it is `duty: true`, checked on its
+    // own line, that keeps them out of the flying count.
+    expect(codeOf('FS')!.removes).toBe(0)
+    expect(codeOf('HS')!.removes).toBe(0)
   })
 
   it('does not treat medical, courses or duty as bids', () => {
-    for (const c of ['M', 'HL', 'CSE', 'OD', 'FS', 'HS']) {
+    for (const c of ['M', 'CSE', 'OD', 'FS', 'HS']) {
       expect(codeOf(c)!.bid).toBe(false)
     }
   })
@@ -54,11 +171,31 @@ describe('day codes', () => {
   })
 
   it('is case-insensitive and tolerant of stray whitespace', () => {
-    expect(codeOf(' ll ')).toBe(CODES.LL)
+    expect(codeOf(' ll ')).toEqual(codeOf('LL'))
   })
 
   it('returns undefined for an unknown code rather than throwing', () => {
     expect(codeOf('NOPE')).toBeUndefined()
     expect(codeOf('')).toBeUndefined()
+  })
+
+  it('no longer recognises AM, PM or HO as codes in their own right', () => {
+    expect(codeOf('AM')).toBeUndefined()
+    expect(codeOf('PM')).toBeUndefined()
+    expect(codeOf('HO')).toBeUndefined()
+  })
+
+  it('no longer recognises HL as a code', () => {
+    expect(codeOf('HL')).toBeUndefined()
+  })
+
+  it('rejects a portion on a non-leave or SC-duty marker end to end', () => {
+    expect(codeOf('*M')).toBeUndefined()
+    expect(codeOf('CSE*')).toBeUndefined()
+    expect(codeOf('*FS')).toBeUndefined()
+  })
+
+  it('rejects an asterisk on both sides end to end', () => {
+    expect(codeOf('*LL*')).toBeUndefined()
   })
 })

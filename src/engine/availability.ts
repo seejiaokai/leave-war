@@ -1,10 +1,10 @@
 // How much of each person each day actually has, and the totals a day is
 // judged on.
 //
-// The sheet this replaces counted EMPTY cells, so `AM` cost a whole person and
-// SC duty — someone at work — was indistinguishable from someone on leave.
-// Both are fixed here: availability is fractional, and duty is reported on its
-// own line rather than hidden inside the shortfall.
+// The sheet this replaces counted EMPTY cells, so a half day of leave cost a
+// whole person and SC duty — someone at work — was indistinguishable from
+// someone on leave. Both are fixed here: availability is fractional, and duty
+// is reported on its own line rather than hidden inside the shortfall.
 
 import { codeOf, isDuty } from './codes'
 import { categoryOf, inSquadron, type Category, type Person } from './people'
