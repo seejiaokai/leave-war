@@ -34,6 +34,15 @@ describe('day codes', () => {
     expect(codeOf('LL')!.bid).toBe(true)
   })
 
+  it('removes the whole person for SC duty even though duty short-circuits availability first', () => {
+    // availabilityOf never reads `removes` for FS/HS (it returns on `c.duty`
+    // before getting there), but the catalogue is the single source of truth
+    // for what a code means, and a later consumer reading `removes` alone
+    // must not conclude an SC-duty member is available.
+    expect(codeOf('FS')!.removes).toBe(1)
+    expect(codeOf('HS')!.removes).toBe(1)
+  })
+
   it('does not treat medical, courses or duty as bids', () => {
     for (const c of ['M', 'HL', 'CSE', 'OD', 'FS', 'HS']) {
       expect(codeOf(c)!.bid).toBe(false)

@@ -55,8 +55,12 @@ export const CODES: Record<string, DayCode> = {
   HL: def('HL', 'hospitalisation leave', 1, null, { bid: false }),
   CSE: def('CSE', 'course', 1, null, { bid: false }),
   OD: def('OD', 'overseas duty', 1, null, { bid: false }),
-  FS: def('FS', 'full day SC duty', 0, null, { earnsOil: 1, bid: false, duty: true }),
-  HS: def('HS', 'half day SC duty', 0, null, { earnsOil: 0.5, bid: false, duty: true }),
+  // removes is 1 here even though availabilityOf never reads it for these two
+  // (the `c.duty` branch short-circuits first) — the catalogue is the single
+  // source of truth for what a code means, and FS/HS genuinely remove the
+  // whole person from flying for the day.
+  FS: def('FS', 'full day SC duty', 1, null, { earnsOil: 1, bid: false, duty: true }),
+  HS: def('HS', 'half day SC duty', 1, null, { earnsOil: 0.5, bid: false, duty: true }),
 }
 
 export function codeOf(code: string | undefined | null): DayCode | undefined {
