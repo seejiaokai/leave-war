@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { codeOf } from './codes'
 import { evaluateDay } from './evaluate'
 import { seedGrid, seedPeople, seedPeriod, seedRequirements } from './seed'
 
@@ -37,6 +38,26 @@ describe('seed', () => {
     const reqs = seedRequirements()
     for (const day of seedPeriod().days) {
       expect(['ok', 'amber', 'red']).toContain(evaluateDay(people, grid, reqs, day.date).verdict)
+    }
+  })
+
+  it('grid ids all resolve to real people', () => {
+    const people = seedPeople()
+    const peopleIds = new Set(people.map(p => p.id))
+    const grid = seedGrid()
+    for (const id of Object.keys(grid)) {
+      expect(peopleIds.has(id)).toBe(true, `grid contains unknown id: ${id}`)
+    }
+  })
+
+  it('grid codes all resolve in the catalogue', () => {
+    const grid = seedGrid()
+    for (const [id, days] of Object.entries(grid)) {
+      for (const [date, code] of Object.entries(days)) {
+        expect(codeOf(code)).toBeDefined(
+          `grid[${id}]['${date}'] has unknown code: ${code}`
+        )
+      }
     }
   })
 })
