@@ -190,3 +190,71 @@ test('opening the bid sheet never makes the page scroll sideways', async ({ page
   )
   expect(overflow).toBeLessThanOrEqual(1)
 })
+
+// A cell Raptor owns must be indistinguishable in COLOUR from an approved
+// bid — the squadron's colour convention is that green means approved, and
+// where the approval happened does not change that. Only a real browser
+// computes which of the two rules on the chip actually won.
+test('a cell Raptor owns is the same green as an approved bid', async ({ page }) => {
+  const bg = (sel: string) => page.locator(sel).evaluate(el => getComputedStyle(el).backgroundColor)
+  const raptor = await bg('[data-testid="cell-tata-2026-01-09"] .c')
+  const bid = await bg('[data-testid="cell-jaguar-2026-01-16"] .c')
+  expect(raptor).toBe(bid)
+  expect(raptor).not.toBe('rgba(0, 0, 0, 0)')
+})
+
+// ...and the mark that distinguishes it must actually be painted, rather
+// than merely being a class jsdom can see. If this ever reads as damage on a
+// real device the rule is meant to be deleted, so it is asserted as a
+// deliberate decision and not left to rot unnoticed.
+test('the Raptor mark is painted, and an ordinary bid carries none', async ({ page }) => {
+  const edge = (sel: string) => page.locator(sel).evaluate(el => {
+    const s = getComputedStyle(el)
+    return { width: s.borderLeftWidth, style: s.borderLeftStyle }
+  })
+  const raptor = await edge('[data-testid="cell-tata-2026-01-09"] .c')
+  expect(parseFloat(raptor.width)).toBeGreaterThan(0)
+  expect(raptor.style).toBe('solid')
+
+  const moved = await edge('[data-testid="cell-miles-2026-02-03"] .c')
+  expect(parseFloat(moved.width)).toBeGreaterThan(0)
+  expect(moved.style).toBe('dotted')
+
+  const plain = await edge('[data-testid="cell-jaguar-2026-01-16"] .c')
+  expect(parseFloat(plain.width) || 0).toBe(0)
+})
+
+test('a cell Raptor owns offers no way to change it', async ({ page }) => {
+  await page.locator('[data-testid="cell-tata-2026-01-09"]').click()
+  await expect(page.locator('[data-testid="raptor-sheet"]')).toBeVisible()
+  await expect(page.locator('[data-testid="bid-LL"]')).toHaveCount(0)
+  await expect(page.locator('[data-testid="decide-approve"]')).toHaveCount(0)
+})
+
+// The workflow the owner described: closing the war makes the sheet
+// view-only for the squadron, and the admin account keeps working.
+test('closing the war locks the squadron out, and the admin account still edits', async ({ page }) => {
+  await page.locator('[data-testid="stage-advance"]').click()
+  await expect(page.locator('[data-testid="stage-now"]')).toHaveText('BIDDING CLOSED')
+
+  await page.locator('[data-testid="cell-dusk-2026-02-11"]').click()
+  await expect(page.locator('[data-testid="bid-picker"]')).toHaveCount(0)
+
+  await page.locator('[data-testid="role-toggle"]').click()
+  await page.locator('[data-testid="cell-dusk-2026-02-11"]').click()
+  await expect(page.locator('[data-testid="bid-picker"]')).toBeVisible()
+})
+
+test('an admin moves a bid to another date, and it lands pending there', async ({ page }) => {
+  await page.locator('[data-testid="stage-advance"]').click()
+  await page.locator('[data-testid="role-toggle"]').click()
+  await page.locator('[data-testid="cell-asics-2026-01-23"]').click()
+  await page.locator('[data-testid="shift-date"]').fill('2026-01-30')
+  await page.locator('[data-testid="decide-shift"]').click()
+
+  await expect(page.locator('[data-testid="cell-asics-2026-01-23"] .c')).toHaveCount(0)
+  const moved = page.locator('[data-testid="cell-asics-2026-01-30"] .c')
+  await expect(moved).toBeVisible()
+  expect(await moved.getAttribute('class')).toContain('tbc')
+  expect(await moved.getAttribute('class')).toContain('moved')
+})
