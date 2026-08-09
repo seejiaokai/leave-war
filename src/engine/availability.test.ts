@@ -83,4 +83,28 @@ describe('countsFor', () => {
     const gone = [...people, p('old', 'pilot', 'instructor', { to: '2026-01-01' })]
     expect(countsFor(gone, {}, '2026-01-05').byCategory.IP).toBe(2)
   })
+
+  it('ensures pilots can be the constraining seat with fractional availability', () => {
+    // Take the baseline people (3 pilots, 3 WSOs), remove half of one pilot
+    // with a half-day code: 2.5 pilots, 3 WSOs -> 2.5 sets
+    const grid: Grid = { ip1: { '2026-01-05': 'AM' } }
+    expect(countsFor(people, grid, '2026-01-05').sets).toBe(2.5)
+  })
+
+  it('does not count posted-out people in duty tally even if they carry an SC duty code', () => {
+    const postedOut = p('gone', 'pilot', 'instructor', { to: '2026-01-04' })
+    const withPostedOutDuty = [...people, postedOut]
+    const grid: Grid = { gone: { '2026-01-05': 'FS' } }
+    expect(countsFor(withPostedOutDuty, grid, '2026-01-05').duty).toBe(0)
+  })
+
+  it('counts HS duty code in the duty tally like FS', () => {
+    const grid: Grid = { ip1: { '2026-01-05': 'HS' } }
+    const c = countsFor(people, grid, '2026-01-05')
+    expect(c.duty).toBe(1)
+  })
+
+  it('handles PM half-day code', () => {
+    expect(availabilityOf(p('a', 'pilot', 'ops'), '2026-01-05', 'PM')).toBe(0.5)
+  })
 })
