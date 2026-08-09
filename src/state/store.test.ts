@@ -618,3 +618,60 @@ describe('shifting a bid', () => {
     expect(getState().states.dusk['2026-02-18'].shiftedFrom).toBe('2026-02-11')
   })
 })
+
+describe('balances in the store', () => {
+  it('boots with an opening figure for everyone and a ledger', () => {
+    expect(Object.keys(getState().openings).length).toBe(getState().people.length)
+    expect(getState().ledger.length).toBeGreaterThan(0)
+  })
+
+  it('persists and reloads both', () => {
+    const backend = memoryBackend()
+    initStore(backend)
+    const openings = getState().openings
+    const ledger = getState().ledger
+    initStore(backend)
+    expect(getState().openings).toEqual(openings)
+    expect(getState().ledger).toEqual(ledger)
+  })
+
+  // Each shape is asserted against a seed-only value so a fallback to `{}`
+  // or `[]` would not pass by accident.
+  it.each([
+    ['not json', 'not json'],
+    ['an array', '[]'],
+    ['a counter nobody defined', '{"ramp":{"holiday":5}}'],
+    ['a figure that is not a number', '{"ramp":{"annual":"lots"}}'],
+    // NaN is the dangerous one: it propagates silently through every sum it
+    // touches, turning a whole column of balances into "NaN" with nothing to
+    // say why. JSON has no NaN literal, so it arrives as null.
+    ['a non-finite figure', '{"ramp":{"annual":null}}'],
+  ])('falls back to the seeded openings when the backend holds %s', (_label, raw) => {
+    const backend = memoryBackend()
+    backend.write('openings', raw)
+    initStore(backend)
+    expect(getState().openings.ramp.annual).toBe(12)
+  })
+
+  it.each([
+    ['not json', 'not json'],
+    ['an object rather than a list', '{}'],
+    ['an entry with no reason', '[{"id":"x","personId":"ramp","counter":"annual","amount":1,"date":"2026-01-01","approvedBy":"SQNCDR"}]'],
+    ['an entry with no approver', '[{"id":"x","personId":"ramp","counter":"annual","amount":1,"date":"2026-01-01","reason":"top-up"}]'],
+    ['an entry against an unknown counter', '[{"id":"x","personId":"ramp","counter":"holiday","amount":1,"date":"2026-01-01","reason":"r","approvedBy":"a"}]'],
+  ])('falls back to the seeded ledger when the backend holds %s', (_label, raw) => {
+    const backend = memoryBackend()
+    backend.write('ledger', raw)
+    initStore(backend)
+    expect(getState().ledger.some(e => e.id === 'l1')).toBe(true)
+  })
+
+  it('keeps a well-formed stored ledger', () => {
+    const backend = memoryBackend()
+    backend.write('ledger', '[{"id":"x","personId":"ramp","counter":"oil","amount":2.5,"date":"2026-01-01","reason":"CNY","approvedBy":"SQNCDR"}]')
+    initStore(backend)
+    expect(getState().ledger).toEqual([
+      { id: 'x', personId: 'ramp', counter: 'oil', amount: 2.5, date: '2026-01-01', reason: 'CNY', approvedBy: 'SQNCDR' },
+    ])
+  })
+})

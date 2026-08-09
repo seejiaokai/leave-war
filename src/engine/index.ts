@@ -3,6 +3,7 @@
 export * from './availability'
 export * from './bids'
 export * from './codes'
+export * from './counters'
 export * from './evaluate'
 export * from './people'
 export * from './period'

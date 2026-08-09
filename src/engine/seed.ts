@@ -6,6 +6,7 @@ import { buildDays, type Period } from './period'
 import type { Person } from './people'
 import type { Grid } from './availability'
 import type { States } from './bids'
+import type { Ledger, Openings } from './counters'
 import type { Requirements } from './requirements'
 
 type Row = [string, Person['seat'], Person['band'], boolean, string | null]
@@ -144,4 +145,48 @@ export function seedStates(): States {
     roulette: { '2026-01-15': { state: 'approved', source: 'bid' } },
     cross: { '2026-03-10': { state: 'refused', source: 'bid' } },
   }
+}
+
+// Opening balances, and the ledger that has moved them since. Shaped like
+// the squadron's real figures rather than round numbers: §Counters records
+// that balances already go negative in the workbook — annual at −14, OIL at
+// −5.5 — so CROSS opens deep in the red and DECAL's OIL is negative too.
+// Both must render on first run, because "negative shows red and is never
+// refused" is a rule nobody can judge against an all-positive screen.
+export function seedOpenings(): Openings {
+  return {
+    ramp: { annual: 12, oil: 3, ccl: 5 },
+    tata: { annual: 8, oil: 1.5 },
+    splice: { annual: 15, oil: 0.5, pl: 10 },
+    jaguar: { annual: 4, oil: 2 },
+    switcher: { annual: 6, el: 14 },
+    asics: { annual: 9.5, oil: 4 },
+    pipper: { annual: 11, oil: 1 },
+    dusk: { annual: 14, oil: 2.5, ccl: 5 },
+    miles: { annual: 7, oil: 6 },
+    roulette: { annual: 10, ccl: 5, pcl: 6 },
+    cross: { annual: -12, oil: 1 },
+    decal: { annual: 5, oil: -4.5 },
+    skin: { annual: 13, oil: 2 },
+    slammed: { annual: 3, oil: 0, fcl: 2 },
+    cage: { annual: 16, oil: 1 },
+    reset: { annual: 2, oil: 8 },
+  }
+}
+
+// The ledger holds only what the GRID cannot already account for: the annual
+// top-up, an award, a correction. Leave taken is not posted here — the
+// person's own row is that record, and a second copy of it would be a second
+// version of the truth. See `counters.ts`.
+export function seedLedger(): Ledger {
+  return [
+    { id: 'l1', personId: 'ramp', counter: 'annual', amount: 14, date: '2026-01-01', reason: 'Annual leave top-up', approvedBy: 'SQNCDR' },
+    { id: 'l2', personId: 'tata', counter: 'annual', amount: 14, date: '2026-01-01', reason: 'Annual leave top-up', approvedBy: 'SQNCDR' },
+    { id: 'l3', personId: 'cross', counter: 'annual', amount: 14, date: '2026-01-01', reason: 'Annual leave top-up', approvedBy: 'SQNCDR' },
+    { id: 'l4', personId: 'jaguar', counter: 'oil', amount: 2, date: '2026-01-19', reason: 'CNY workplan', approvedBy: 'SQNCDR' },
+    { id: 'l5', personId: 'asics', counter: 'oil', amount: 1.5, date: '2026-02-02', reason: 'Exercise recovery', approvedBy: 'OC OPS' },
+    // A correction is a negative amount, not a second mechanism — one ledger
+    // covers top-ups, awards and fixes alike (§Counters).
+    { id: 'l6', personId: 'miles', counter: 'annual', amount: -1, date: '2026-02-14', reason: 'Correction: double-counted 12 Jan', approvedBy: 'SQNCDR' },
+  ]
 }

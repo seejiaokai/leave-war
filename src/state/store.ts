@@ -7,7 +7,10 @@ import {
   isBiddable,
   nextStage,
   raptorOwns,
+  COUNTERS,
   seedGrid,
+  seedLedger,
+  seedOpenings,
   seedPeople,
   seedPeriod,
   seedRequirements,
@@ -16,7 +19,10 @@ import {
   type BidRecord,
   type BidSource,
   type BidState,
+  type CounterName,
   type Grid,
+  type Ledger,
+  type Openings,
   type Period,
   type Person,
   type Requirements,
@@ -32,6 +38,11 @@ interface State {
   requirements: Requirements
   grid: Grid
   states: States
+  /** Where each counter started. A balance is this plus the ledger less what
+   *  the grid has drawn — never a stored figure, which would be a second
+   *  version of a truth the grid already holds. */
+  openings: Openings
+  ledger: Ledger
   /** Who the person at the keyboard says they are. Nothing verifies it —
    *  there is no login — so this decides which controls appear, not who is
    *  allowed to use them. See `docs/known-gaps.md`. */
@@ -50,6 +61,8 @@ function blank(): State {
     requirements: seedRequirements(),
     grid: seedGrid(),
     states: seedStates(),
+    openings: seedOpenings(),
+    ledger: seedLedger(),
     // The squadron is the common case, so the app opens as one. An admin
     // says so deliberately rather than arriving with the locks already off.
     role: 'member',
@@ -127,6 +140,46 @@ function readStates(x: unknown): States | null {
   return out
 }
 
+const COUNTER_NAMES = new Set<string>(COUNTERS)
+
+// Openings are `personId -> counter -> number`. A non-finite figure is the
+// dangerous shape here rather than merely a wrong one: NaN propagates
+// silently through every sum it touches, so a single bad leaf would turn a
+// whole column of balances into "NaN" with nothing to say why.
+function readOpenings(x: unknown): Openings | null {
+  if (!isPlainObject(x)) return null
+  const out: Openings = {}
+  for (const [id, row] of Object.entries(x)) {
+    if (!isPlainObject(row)) return null
+    const kept: Partial<Record<CounterName, number>> = {}
+    for (const [counter, amount] of Object.entries(row)) {
+      if (!COUNTER_NAMES.has(counter)) return null
+      if (typeof amount !== 'number' || !Number.isFinite(amount)) return null
+      kept[counter as CounterName] = amount
+    }
+    out[id] = kept
+  }
+  return out
+}
+
+function readLedger(x: unknown): Ledger | null {
+  if (!Array.isArray(x)) return null
+  const out: Ledger = []
+  for (const e of x) {
+    if (!isPlainObject(e)) return null
+    const { id, personId, counter, amount, date, reason, approvedBy } = e
+    if (typeof id !== 'string' || typeof personId !== 'string') return null
+    if (typeof counter !== 'string' || !COUNTER_NAMES.has(counter)) return null
+    if (typeof amount !== 'number' || !Number.isFinite(amount)) return null
+    if (typeof date !== 'string') return null
+    // A grant with no reason and no approver is the untraceable free text
+    // the ledger exists to replace, so it is not a grant.
+    if (typeof reason !== 'string' || typeof approvedBy !== 'string') return null
+    out.push({ id, personId, counter: counter as CounterName, amount, date, reason, approvedBy })
+  }
+  return out
+}
+
 /** What the backend holds under `key`, or `null` if there is nothing usable
  *  there. `null` covers both "never written" and "written but unreadable" —
  *  the caller's answer to each is the same, which is to fall back. */
@@ -181,6 +234,9 @@ export function initStore(b?: StorageBackend): void {
   // four names, so a stage added to the cycle cannot become one this refuses
   // to reload. Anything else stored here is not a stage, and the seed's is a
   // better answer than a period stuck in a state nothing can leave.
+  state.openings = readStored('openings', readOpenings) ?? seedOpenings()
+  state.ledger = readStored('ledger', readLedger) ?? seedLedger()
+
   const storedStage = backend.read('stage') as Stage | null
   if (storedStage && STAGE_ORDER.includes(storedStage)) {
     state.period = { ...state.period, stage: storedStage }
@@ -218,6 +274,8 @@ function persist(): void {
   backend.write('states', JSON.stringify(state.states))
   backend.write('stage', state.period.stage)
   backend.write('role', state.role)
+  backend.write('openings', JSON.stringify(state.openings))
+  backend.write('ledger', JSON.stringify(state.ledger))
 }
 
 /** Switch which role the interface is being used as. Unguarded on purpose:

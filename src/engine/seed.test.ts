@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { isBiddable } from './bids'
 import { codeOf } from './codes'
 import { evaluateDay } from './evaluate'
-import { seedGrid, seedPeople, seedPeriod, seedRequirements, seedStates } from './seed'
+import { balanceOf, COUNTERS } from './counters'
+import { seedGrid, seedLedger, seedOpenings, seedPeople, seedPeriod, seedRequirements, seedStates } from './seed'
 
 describe('seed', () => {
   it('has a roster with all four categories represented', () => {
@@ -160,5 +161,59 @@ describe('seedStates', () => {
       if (!ids.has(id)) throw new Error(`state for unknown id: ${id}`)
     }
     expect(Object.keys(seedStates()).length).toBeGreaterThan(0)
+  })
+})
+
+describe('seeded balances', () => {
+  it('gives every person on the roster an opening figure', () => {
+    const openings = seedOpenings()
+    for (const p of seedPeople()) {
+      if (!openings[p.id]) throw new Error(`no opening balance for ${p.id}`)
+    }
+    expect(Object.keys(openings).length).toBeGreaterThan(0)
+  })
+
+  it('opens no counter that is not one of the seven', () => {
+    for (const [id, row] of Object.entries(seedOpenings())) {
+      for (const counter of Object.keys(row)) {
+        if (!COUNTERS.includes(counter as never)) throw new Error(`unknown counter ${counter} for ${id}`)
+      }
+    }
+  })
+
+  it('posts every ledger entry against a real person and a real counter', () => {
+    const ids = new Set(seedPeople().map(p => p.id))
+    const entries = seedLedger()
+    expect(entries.length).toBeGreaterThan(0)
+    for (const e of entries) {
+      if (!ids.has(e.personId)) throw new Error(`ledger entry for unknown id: ${e.personId}`)
+      if (!COUNTERS.includes(e.counter)) throw new Error(`ledger entry for unknown counter: ${e.counter}`)
+      // Every entry has to say WHY and WHO — that traceability is the whole
+      // point of the ledger, and an entry without it is the untraceable free
+      // text this replaces.
+      expect(e.reason).toBeTruthy()
+      expect(e.approvedBy).toBeTruthy()
+    }
+  })
+
+  it('gives every ledger entry a unique id', () => {
+    const ids = seedLedger().map(e => e.id)
+    expect(new Set(ids).size).toBe(ids.length)
+  })
+
+  // §Counters: negative shows red and is never refused. A screen where every
+  // figure is positive cannot show that rule working, so the seed has to
+  // carry at least one of each sign.
+  it('shows a negative balance as well as positive ones, so red renders', () => {
+    const [openings, ledger, grid, states] = [seedOpenings(), seedLedger(), seedGrid(), seedStates()]
+    const all = seedPeople().flatMap(p => COUNTERS.map(c => balanceOf(openings, ledger, grid, states, p.id, c)))
+    expect(all.some(v => v < 0)).toBe(true)
+    expect(all.some(v => v > 0)).toBe(true)
+  })
+
+  // A correction posted as a negative amount is the mechanism §Counters
+  // describes; seeding one keeps it from being theoretical.
+  it('includes a correction posted as a negative amount', () => {
+    expect(seedLedger().some(e => e.amount < 0)).toBe(true)
   })
 })
