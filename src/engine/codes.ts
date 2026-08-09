@@ -110,8 +110,23 @@ export function parseCell(raw: string | undefined | null): Cell | null {
   return known ? { type, portion: 'full' } : null
 }
 
-/** The canonical notation for a cell — the asterisk sits where the time sits. */
+/**
+ * The canonical notation for a cell — the asterisk sits where the time sits.
+ *
+ * Mirrors `parseCell`'s strictness rather than only its happy path: that
+ * parser refuses to read `*FS` back as a portioned non-leave marker, so a
+ * caller that hands `formatCell` a non-'full' portion on a non-leave type is
+ * not writing a rare cell, it is holding a `Cell` that could never have come
+ * from `parseCell` in the first place. Emitting `'*FS'` for it would be a
+ * string that looks legitimate right up until it round-trips through
+ * `parseCell` and silently vanishes to `null` — a corrupt leave balance
+ * discovered nowhere near the bug that caused it. Throwing at the point the
+ * bad `Cell` was formatted turns that into a stack trace instead.
+ */
 export function formatCell(cell: Cell): string {
+  if (cell.portion !== 'full' && !LEAVE_TYPE_BY_CODE[cell.type]) {
+    throw new Error(`formatCell: '${cell.type}' cannot carry a portion — only leave types come in halves`)
+  }
   if (cell.portion === 'am') return `*${cell.type}`
   if (cell.portion === 'pm') return `${cell.type}*`
   return cell.type

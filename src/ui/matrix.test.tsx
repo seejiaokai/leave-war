@@ -113,6 +113,27 @@ describe('Matrix', () => {
     expect(ordinaryCell.querySelector('.c.info')?.textContent).toBe('OIL')
   })
 
+  it('carries the am/pm portion class on the chip, derived from the stored asterisk', () => {
+    setCell('ramp', '2026-01-20', '*LL')
+    setCell('ramp', '2026-01-21', 'LL*')
+    setCell('ramp', '2026-01-22', 'LL')
+    render(<Matrix />)
+    // Assert on the chip element itself, not the `<td>` — the portion class
+    // decorates `.c`, and a `<td>`-level assertion would pass even if the
+    // class landed on the wrong element.
+    const morning = screen.getByTestId('cell-ramp-2026-01-20').querySelector('.c')!
+    expect(morning.className).toContain('am')
+    expect(morning.className).not.toContain('pm')
+
+    const afternoon = screen.getByTestId('cell-ramp-2026-01-21').querySelector('.c')!
+    expect(afternoon.className).toContain('pm')
+    expect(afternoon.className).not.toContain('am')
+
+    const wholeDay = screen.getByTestId('cell-ramp-2026-01-22').querySelector('.c')!
+    expect(wholeDay.className).not.toContain('am')
+    expect(wholeDay.className).not.toContain('pm')
+  })
+
   it('shows both the blocked reason and the day\'s events when both exist', () => {
     // The seed's blocked week carries no events, so this is exercised by
     // hand: a day that is both blocked and carries an event line, which the

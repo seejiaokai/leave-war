@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { codeOf, formatCell, isDuty, parseCell, portionAmount } from './codes'
+import { codeOf, formatCell, isDuty, LEAVE_TYPES, parseCell, portionAmount } from './codes'
 
 describe('portionAmount', () => {
   it('costs a whole day for full, half a day for am or pm', () => {
@@ -115,21 +115,35 @@ describe('formatCell', () => {
     expect(formatCell(cell)).toBe('FS')
     expect(parseCell(formatCell(cell))).toEqual(cell)
   })
+
+  it('throws rather than emit a portion on a non-leave marker, which parseCell would only reject', () => {
+    expect(() => formatCell({ type: 'FS', portion: 'am' })).toThrow()
+    expect(() => formatCell({ type: 'M', portion: 'pm' })).toThrow()
+    expect(() => formatCell({ type: 'CSE', portion: 'am' })).toThrow()
+  })
 })
 
 describe('codeOf', () => {
   it('makes a half day cost half a person, not a whole one', () => {
-    expect(codeOf('*LL')!.removes).toBe(0.5)
-    expect(codeOf('LL*')!.removes).toBe(0.5)
-    expect(codeOf('*OIL')!.removes).toBe(0.5)
-    expect(codeOf('LL')!.removes).toBe(1)
+    // Iterates all eight leave types rather than just LL and OIL: the
+    // implementation is generic over `type`, so a future change that wrongly
+    // special-cased one leave type would slip past a test that only ever
+    // checked two of them.
+    for (const { type } of LEAVE_TYPES) {
+      expect(codeOf(`*${type}`)!.removes).toBe(0.5)
+      expect(codeOf(`${type}*`)!.removes).toBe(0.5)
+      expect(codeOf(type)!.removes).toBe(1)
+    }
   })
 
   it('spends the right counter, scaled by the portion', () => {
-    expect(codeOf('LL')!.spends).toEqual({ counter: 'annual', amount: 1 })
-    expect(codeOf('*LL')!.spends).toEqual({ counter: 'annual', amount: 0.5 })
-    expect(codeOf('*OIL')!.spends).toEqual({ counter: 'oil', amount: 0.5 })
-    expect(codeOf('EL')!.spends).toEqual({ counter: 'el', amount: 1 })
+    // Same reasoning as above: every leave type's counter and amount, not
+    // just LL and OIL, so a wrongly special-cased type shows up here.
+    for (const { type, counter } of LEAVE_TYPES) {
+      expect(codeOf(type)!.spends).toEqual({ counter, amount: 1 })
+      expect(codeOf(`*${type}`)!.spends).toEqual({ counter, amount: 0.5 })
+      expect(codeOf(`${type}*`)!.spends).toEqual({ counter, amount: 0.5 })
+    }
   })
 
   it('spends nothing for medical, courses and overseas duty', () => {

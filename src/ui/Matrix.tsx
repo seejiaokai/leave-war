@@ -1,4 +1,4 @@
-import { categoryOf, evaluatePeriod, inSquadron, isDuty, isWeekend } from '../engine'
+import { categoryOf, evaluatePeriod, inSquadron, isDuty, isWeekend, parseCell } from '../engine'
 import { getState } from '../state/store'
 import { CountRows } from './CountRows'
 import { useVersion } from './useStore'
@@ -81,9 +81,17 @@ export function Matrix() {
                     // ref) arrive with a later plan. A bare "PO" chip on a
                     // posted-out cell carries no state class.
                     const chipState = here && code ? (isDuty(code) ? 'sc' : 'info') : ''
+                    // The half-day fill is read off the stored string via
+                    // `parseCell`, never kept as its own bit of state and
+                    // never guessed by matching an asterisk here in the
+                    // component. The asterisk in `text` stays the one source
+                    // of truth; this is only a derived echo of it, so the
+                    // two can never disagree.
+                    const portion = here && code ? parseCell(code)?.portion : undefined
+                    const portionClass = portion === 'am' || portion === 'pm' ? ` ${portion}` : ''
                     return (
                       <td key={d.date} data-testid={`cell-${p.id}-${d.date}`} className={cls}>
-                        {text && <span className={`c${chipState ? ` ${chipState}` : ''}`}>{text}</span>}
+                        {text && <span className={`c${chipState ? ` ${chipState}` : ''}${portionClass}`}>{text}</span>}
                       </td>
                     )
                   })}

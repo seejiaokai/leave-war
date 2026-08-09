@@ -80,6 +80,35 @@ test('a blocked day that falls on a weekend still paints amber, not grey', async
   expect(bg).toBe(BLOCKED_BG)
 })
 
+// jsdom (the unit-test DOM) never computes an element's cascade, so it can
+// prove the `.am`/`.pm` class landed on the right chip but not that the
+// divider it triggers is actually painted — that only a real browser's
+// `getComputedStyle(el, '::after')` can answer. Seed: ramp carries `*OIL`
+// on 2026-02-10 (morning, half day), and OL on 2026-01-01 (whole day, no
+// divider).
+test('the half-day divider is painted on a half-day chip and absent on a whole-day chip', async ({ page }) => {
+  const half = page.locator('[data-testid="cell-ramp-2026-02-10"] .c')
+  const halfAfter = await half.evaluate(el => {
+    const s = getComputedStyle(el, '::after')
+    return { width: s.width, background: s.backgroundColor }
+  })
+  expect(parseFloat(halfAfter.width)).toBeGreaterThan(0)
+  expect(halfAfter.background).not.toBe('rgba(0, 0, 0, 0)')
+
+  // A whole-day chip carries no `::after` rule at all, so the browser
+  // reports it with no generated box: `content: none` and a computed width
+  // of `auto` rather than `0px` — `parseFloat('auto')` is `NaN`, not `0`, so
+  // this checks the same "nothing painted" fact via content and background
+  // instead of width.
+  const whole = page.locator('[data-testid="cell-ramp-2026-01-01"] .c')
+  const wholeAfter = await whole.evaluate(el => {
+    const s = getComputedStyle(el, '::after')
+    return { content: s.content, background: s.backgroundColor }
+  })
+  expect(wholeAfter.content).toBe('none')
+  expect(wholeAfter.background).toBe('rgba(0, 0, 0, 0)')
+})
+
 test('the matrix stays within a sane DOM size', async ({ page }) => {
   // 16 people x 90 days plus counts and headers. Measured 2227 nodes on
   // 2026-08-09, before the Raptor restyle. The chip-span wrapper the
