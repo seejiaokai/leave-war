@@ -2343,3 +2343,56 @@ Checked against the spec:
 Deliberately **not** in this plan, each needing its own: bid states and the cycle's stages; approval; counters, balances and the ledger; automatic OIL from an approved schedule; the rules editor; the shared backend.
 
 The spec's `stage` field is defined in Task 4 and seeded as `open` in Task 8 but nothing reads it yet — that is intentional, and the bidding plan is what gives it meaning.
+
+---
+
+## Amendments made during execution
+
+This plan was executed task by task, each task reviewed on its own diff, then
+the whole branch reviewed together. **The code is the record now** — where this
+document and the tree disagree, the tree is right. The corrections above were
+folded back in as they were found; this section lists what the final
+whole-branch review changed afterwards, so the gap between plan and tree is
+visible rather than silent.
+
+Every one of these was a defect in this plan, not in its execution:
+
+- **A member who had not yet arrived was labelled `PO`, posted out.**
+  `inSquadron` is false on both sides of the roster window, and the render site
+  treated both the same. Nobody in the seed has a `from` date, so twelve scoped
+  reviews all missed it. Arrival now renders an empty grey cell; `PO` is
+  reserved for a genuine posting-out.
+- **`FS` and `HS` declared `removes: 0` while removing the whole person**, because
+  `availabilityOf` short-circuits on `duty` before reading `removes`. The
+  catalogue is meant to be the single source of truth for what a code means, so
+  it should not say the opposite of what happens. Both are `removes: 1` now,
+  behaviourally inert because the short-circuit still runs first.
+- **Weekend shading was scaffolded on both sides and joined to neither** —
+  `isWeekend()` called by nothing, `.mx .weekend` emitted by nothing. Now wired,
+  which immediately exposed the next one.
+- **A blocked weekend lost its orange.** `.blocked` and `.weekend` have equal
+  specificity, and `.weekend` was declared second, so the grey won. Inert while
+  the class was unused; live the moment it was wired. Source order now decides
+  in `.blocked`'s favour, the seed's exercise block runs into a Saturday so the
+  overlap exists in real data, and the browser gate asserts the computed colour
+  — jsdom computes no cascade and would have passed throughout.
+- **The persisted-grid guard checked only the top level**, so a stored row of
+  non-strings passed validation and then crashed inside `codeOf`. It walks the
+  rows now.
+- **`e2e/` was in no TypeScript project**, so `tsc -b` never checked it.
+- Smaller: `isDuty()` was bypassed by both real call sites, `CATEGORIES` had no
+  consumer at all, and a blocked day's `title` showed the reason or the events
+  but never both.
+
+Two test defects worth naming separately, because they are the kind this whole
+process exists to catch and they were caught by review rather than by running
+green:
+
+- Two `seed.test.ts` cases iterated and threw inside a loop with no assertion
+  that the loop ever ran, so an empty collection passed them vacuously.
+- The store's unreadable-data test asserted only `toBeTypeOf('object')`, which
+  `null` also satisfies.
+
+Known limitations that were **not** fixed, and why, are in `docs/known-gaps.md`.
+The shared backend is the next phase of work, and until it exists this is a
+prototype the owner can judge rather than a tool the squadron can use.
