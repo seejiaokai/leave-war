@@ -5,6 +5,7 @@
 import { buildDays, type Period } from './period'
 import type { Person } from './people'
 import type { Grid } from './availability'
+import type { States } from './bids'
 import type { Requirements } from './requirements'
 
 type Row = [string, Person['seat'], Person['band'], boolean, string | null]
@@ -99,5 +100,25 @@ export function seedGrid(): Grid {
     roulette: { '2026-01-15': 'CCL' },
     cross: { '2026-03-10': 'LL' },
     skin: { '2026-01-03': 'HS' },
+  }
+}
+
+// Enough of each state that the matrix shows all three colours on first run.
+// Every entry here must name a cell that seedGrid() actually holds, and a
+// code someone would bid for — a state on a cell with no code is a bug the
+// tests beside this one will catch.
+//
+// SPLICE's LL on 2026-01-08 is deliberately left out: a bid with no decision
+// recorded is a real shape the matrix has to render (it reads as pending),
+// and leaving one unstated is how that path gets exercised on first run.
+export function seedStates(): States {
+  return {
+    ramp: { '2026-01-01': 'approved', '2026-02-10': 'pending' },
+    tata: { '2026-01-09': 'approved' },
+    jaguar: { '2026-01-16': 'approved', '2026-01-17': 'approved', '2026-01-19': 'refused' },
+    asics: { '2026-01-08': 'approved', '2026-01-09': 'refused', '2026-01-23': 'pending' },
+    miles: { '2026-02-02': 'pending', '2026-02-03': 'pending' },
+    roulette: { '2026-01-15': 'approved' },
+    cross: { '2026-03-10': 'refused' },
   }
 }

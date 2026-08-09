@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
+import { isBiddable } from './bids'
 import { codeOf } from './codes'
 import { evaluateDay } from './evaluate'
-import { seedGrid, seedPeople, seedPeriod, seedRequirements } from './seed'
+import { seedGrid, seedPeople, seedPeriod, seedRequirements, seedStates } from './seed'
 
 describe('seed', () => {
   it('has a roster with all four categories represented', () => {
@@ -44,7 +45,7 @@ describe('seed', () => {
     const grid = seedGrid()
     const reqs = seedRequirements()
     for (const day of seedPeriod().days) {
-      expect(['ok', 'amber', 'red']).toContain(evaluateDay(people, grid, {}, reqs, day.date).verdict)
+      expect(['ok', 'amber', 'red']).toContain(evaluateDay(people, grid, seedStates(), reqs, day.date).verdict)
     }
   })
 
@@ -76,5 +77,50 @@ describe('seed', () => {
         }
       }
     }
+  })
+})
+
+describe('seedStates', () => {
+  it('shows all three states so the screen exercises every colour', () => {
+    const seen = new Set(Object.values(seedStates()).flatMap(r => Object.values(r)))
+    expect(seen).toEqual(new Set(['pending', 'approved', 'refused']))
+  })
+
+  it('never records a state for a cell that has no code', () => {
+    const grid = seedGrid()
+    for (const [id, row] of Object.entries(seedStates())) {
+      for (const date of Object.keys(row)) {
+        if (!grid[id]?.[date]) throw new Error(`state with no code: ${id} ${date}`)
+      }
+    }
+    expect(Object.keys(seedStates()).length).toBeGreaterThan(0)
+  })
+
+  it('never records a state for a code nobody bids for', () => {
+    const grid = seedGrid()
+    for (const [id, row] of Object.entries(seedStates())) {
+      for (const date of Object.keys(row)) {
+        if (!isBiddable(grid[id][date])) throw new Error(`state on a non-bid code: ${id} ${date}`)
+      }
+    }
+    expect(Object.keys(seedStates()).length).toBeGreaterThan(0)
+  })
+
+  // The two loops above walk `seedStates()` and would pass vacuously against
+  // a row that exists but is empty. Count the entries, not the rows.
+  it('records enough states to be worth walking', () => {
+    const entries = Object.values(seedStates()).flatMap(r => Object.keys(r))
+    expect(entries.length).toBeGreaterThan(5)
+  })
+
+  // A state on a person the roster does not hold would paint nothing and
+  // point at nobody — the same class of bug as a grid row with an unknown id,
+  // which the grid tests above already guard.
+  it('names only people the roster actually holds', () => {
+    const ids = new Set(seedPeople().map(p => p.id))
+    for (const id of Object.keys(seedStates())) {
+      if (!ids.has(id)) throw new Error(`state for unknown id: ${id}`)
+    }
+    expect(Object.keys(seedStates()).length).toBeGreaterThan(0)
   })
 })
