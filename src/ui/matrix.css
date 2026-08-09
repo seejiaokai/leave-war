@@ -1,0 +1,70 @@
+.mx-wrap {
+  overflow: auto;
+  max-height: 100vh;
+  -webkit-overflow-scrolling: touch;
+}
+
+.mx {
+  border-collapse: separate;
+  border-spacing: 0;
+  font: 11px/1.4 system-ui, sans-serif;
+}
+
+.mx th,
+.mx td {
+  border-right: 1px solid #ddd;
+  border-bottom: 1px solid #ddd;
+  padding: 2px 4px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+/* The frozen callsign column. `left: 0` plus a background is what stops the
+   day cells showing through it while the grid scrolls sideways. */
+.mx .who {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: #fff;
+  text-align: left;
+  min-width: 84px;
+}
+
+/* The sticky date header. z-index 3 so the corner cell wins over both. */
+.mx thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #f5f5f5;
+}
+
+.mx thead th.who {
+  z-index: 3;
+}
+
+.mx .day {
+  min-width: 30px;
+}
+
+.mx .blocked {
+  background: #FFA500;
+}
+
+.mx .weekend {
+  background: #f0f0f0;
+}
+
+.mx td.duty {
+  background: #FFFF00;
+}
+
+.mx td.gone {
+  background: #e8e8e8;
+  color: #999;
+}
+
+.mx .cat {
+  color: #666;
+  font-size: 10px;
+  padding-left: 6px;
+}
