@@ -57,6 +57,20 @@ describe('store', () => {
     initStore(backend)
     expect(getState().grid).toBeTypeOf('object')
     expect(getState().people.length).toBeGreaterThan(0)
+    // Asserted against a seed-only value, same as the shapes below — a
+    // fallback to `{}` would otherwise pass this just as easily.
+    expect(getState().grid.ramp?.['2026-01-01']).toBe('OL')
+  })
+
+  // A grid whose top level is a plain object but whose rows are not objects
+  // of strings (e.g. a numeric cell) used to pass the old top-level-only
+  // guard, then crash on boot inside codeOf, which expects a string. The
+  // guard's job is to degrade to the seed here exactly as it does above.
+  it('falls back to the seed when a grid row is not a plain object of strings', () => {
+    const backend = memoryBackend()
+    backend.write('grid', '{"ramp":{"2026-01-01":123}}')
+    initStore(backend)
+    expect(getState().grid.ramp?.['2026-01-01']).toBe('OL')
   })
 
   // The three shapes below all parse as valid JSON but are not a plain

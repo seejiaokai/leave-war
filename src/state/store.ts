@@ -35,15 +35,35 @@ function blank(): State {
   }
 }
 
+function isPlainObject(x: unknown): x is Record<string, unknown> {
+  return !!x && typeof x === 'object' && !Array.isArray(x)
+}
+
+// A grid is a plain object of plain objects of strings: personId -> date ->
+// code. Checking only the top level lets a shape like `{"ramp":{"...":123}}`
+// through, which then crashes on boot inside codeOf (which expects a
+// string). The guard's job is to degrade to the seed instead, same as every
+// other malformed shape.
+function isValidGrid(x: unknown): x is Grid {
+  if (!isPlainObject(x)) return false
+  for (const row of Object.values(x)) {
+    if (!isPlainObject(row)) return false
+    for (const code of Object.values(row)) {
+      if (typeof code !== 'string') return false
+    }
+  }
+  return true
+}
+
 function loadGrid(): Grid {
   const raw = backend.read('grid')
   if (!raw) return seedGrid()
   try {
     const parsed = JSON.parse(raw)
-    // Anything that is not a plain object is unusable; the seed is a better
-    // answer than a crash on boot.
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return seedGrid()
-    return parsed as Grid
+    // Anything that is not a valid grid shape is unusable; the seed is a
+    // better answer than a crash on boot.
+    if (!isValidGrid(parsed)) return seedGrid()
+    return parsed
   } catch {
     return seedGrid()
   }
