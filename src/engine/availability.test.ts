@@ -147,7 +147,7 @@ describe('availability and the bid state', () => {
     const people = [p('op1', 'pilot', 'ops'), p('ow1', 'wso', 'ops')]
     const grid: Grid = { op1: { '2026-01-05': 'LL' } }
     expect(countsFor(people, grid, {}, '2026-01-05').byCategory.OPSP).toBe(0)
-    const states: States = { op1: { '2026-01-05': 'refused' } }
+    const states: States = { op1: { '2026-01-05': { state: 'refused', source: 'bid' } } }
     expect(countsFor(people, grid, states, '2026-01-05').byCategory.OPSP).toBe(1)
   })
 })

@@ -12,6 +12,8 @@ import {
   seedRequirements,
   seedStates,
   STAGE_ORDER,
+  type BidRecord,
+  type BidSource,
   type BidState,
   type Grid,
   type Period,
@@ -66,31 +68,71 @@ function isValidGrid(x: unknown): x is Grid {
 }
 
 const BID_STATES = new Set(['pending', 'approved', 'refused'])
+const BID_SOURCES = new Set(['bid', 'raptor'])
 
-// Same shape as a grid, but the leaves are one of three known strings rather
-// than free text. A state nobody defined is not a state — it would flow
-// straight into `removesAvailability`, where anything that is not exactly
-// 'refused' silently removes a person.
-function isValidStates(x: unknown): x is States {
-  if (!isPlainObject(x)) return false
-  for (const row of Object.values(x)) {
-    if (!isPlainObject(row)) return false
-    for (const s of Object.values(row)) {
-      if (typeof s !== 'string' || !BID_STATES.has(s)) return false
-    }
+/**
+ * Read one stored leaf into a `BidRecord`, or `null` if it is not one.
+ *
+ * Two shapes are accepted. The record is what is written today. A bare
+ * string is what earlier builds wrote, and it is MIGRATED rather than
+ * rejected: bids already sitting in someone's browser predate sources
+ * entirely, and degrading them to the seed would silently throw away real
+ * decisions to gain nothing. A string could only ever have meant a bid the
+ * squadron placed here, so `source: 'bid'` is a fact, not a guess.
+ */
+function readRecord(leaf: unknown): BidRecord | null {
+  if (typeof leaf === 'string') {
+    return BID_STATES.has(leaf) ? { state: leaf as BidState, source: 'bid' } : null
   }
-  return true
+  if (!isPlainObject(leaf)) return null
+  const { state, source, shiftedFrom } = leaf
+  if (typeof state !== 'string' || !BID_STATES.has(state)) return null
+  if (typeof source !== 'string' || !BID_SOURCES.has(source)) return null
+  if (shiftedFrom !== undefined && typeof shiftedFrom !== 'string') return null
+  const out: BidRecord = { state: state as BidState, source: source as BidSource }
+  if (shiftedFrom !== undefined) out.shiftedFrom = shiftedFrom
+  return out
+}
+
+// Same shape as a grid, but each leaf is a record rather than free text. A
+// state nobody defined is not a state — it would flow straight into
+// `removesAvailability`, where anything that is not exactly 'refused'
+// silently removes a person.
+//
+// Unlike the grid guard this one CONVERTS as it validates, because the
+// migration above has to happen somewhere and doing it here means every
+// caller downstream sees one shape.
+function readStates(x: unknown): States | null {
+  if (!isPlainObject(x)) return null
+  const out: States = {}
+  for (const [id, row] of Object.entries(x)) {
+    if (!isPlainObject(row)) return null
+    const kept: Record<string, BidRecord> = {}
+    for (const [date, leaf] of Object.entries(row)) {
+      const record = readRecord(leaf)
+      if (!record) return null
+      kept[date] = record
+    }
+    out[id] = kept
+  }
+  return out
 }
 
 /** What the backend holds under `key`, or `null` if there is nothing usable
  *  there. `null` covers both "never written" and "written but unreadable" —
  *  the caller's answer to each is the same, which is to fall back. */
 function read<T>(key: string, valid: (x: unknown) => x is T): T | null {
+  return readStored(key, x => (valid(x) ? x : null))
+}
+
+/** As `read`, but the reader may CONVERT rather than merely accept — which
+ *  is what the states migration needs. Returning `null` from `parse` means
+ *  the stored value is unusable and the caller should fall back. */
+function readStored<T>(key: string, parse: (x: unknown) => T | null): T | null {
   const raw = backend.read(key)
   if (!raw) return null
   try {
-    const parsed: unknown = JSON.parse(raw)
-    return valid(parsed) ? parsed : null
+    return parse(JSON.parse(raw))
   } catch {
     return null
   }
@@ -106,9 +148,9 @@ function read<T>(key: string, valid: (x: unknown) => x is T): T | null {
 function reconcile(grid: Grid, states: States): States {
   const out: States = {}
   for (const [id, row] of Object.entries(states)) {
-    const kept: Record<string, BidState> = {}
-    for (const [date, s] of Object.entries(row)) {
-      if (isBiddable(grid[id]?.[date])) kept[date] = s
+    const kept: Record<string, BidRecord> = {}
+    for (const [date, record] of Object.entries(row)) {
+      if (isBiddable(grid[id]?.[date])) kept[date] = record
     }
     if (Object.keys(kept).length > 0) out[id] = kept
   }
@@ -124,7 +166,7 @@ export function initStore(b?: StorageBackend): void {
   // Seed decisions belong to the seed grid and to nothing else. A stored
   // grid is the squadron's own data, and hanging seeded approvals off it
   // would approve cells nobody bid for.
-  state.states = reconcile(state.grid, storedGrid ? read('states', isValidStates) ?? {} : seedStates())
+  state.states = reconcile(state.grid, storedGrid ? readStored('states', readStates) ?? {} : seedStates())
 
   // Asked of STAGE_ORDER rather than compared against a second copy of the
   // four names, so a stage added to the cycle cannot become one this refuses
@@ -181,9 +223,9 @@ export function setCell(personId: string, date: string, code: string): void {
   // A code rewritten as ITSELF keeps whatever decision it already carries —
   // re-typing LL over an approved LL must not quietly un-approve it. A code
   // rewritten as a DIFFERENT one is a different ask, so it goes back to
-  // pending: nobody approved a week overseas by approving a day of local
-  // leave.
-  else if (clean !== previous || srow[date] === undefined) srow[date] = 'pending'
+  // pending AND loses any record of having been shifted: that provenance
+  // belonged to the bid that has just been replaced.
+  else if (clean !== previous || srow[date] === undefined) srow[date] = { state: 'pending', source: 'bid' }
 
   state = {
     ...state,
@@ -202,7 +244,15 @@ export function setBidState(personId: string, date: string, bid: BidState): void
   // it, which is exactly the drift `setCell` exists to prevent. Ignore it
   // rather than write it.
   if (!isBiddable(state.grid[personId]?.[date])) return
-  const srow = { ...(state.states[personId] ?? {}), [date]: bid }
+  // Deciding keeps the rest of the record — the source that wrote it, and
+  // the date it was shifted from. Management approving a shifted bid is the
+  // second half of that move, and losing the provenance at exactly the
+  // moment the move completes would make the trail useless.
+  const existing = state.states[personId]?.[date]
+  const srow = {
+    ...(state.states[personId] ?? {}),
+    [date]: { ...(existing ?? { source: 'bid' as const }), state: bid },
+  }
   state = { ...state, states: { ...state.states, [personId]: srow } }
   persist()
   notify()

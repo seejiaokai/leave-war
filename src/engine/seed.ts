@@ -103,7 +103,10 @@ export function seedGrid(): Grid {
   }
 }
 
-// Enough of each state that the matrix shows all three colours on first run.
+// Enough of each state that the matrix shows all three colours on first run,
+// plus one cell Raptor owns and one management shifted, so those two paths
+// render without anyone having to construct them.
+//
 // Every entry here must name a cell that seedGrid() actually holds, and a
 // code someone would bid for — a state on a cell with no code is a bug the
 // tests beside this one will catch.
@@ -113,12 +116,32 @@ export function seedGrid(): Grid {
 // and leaving one unstated is how that path gets exercised on first run.
 export function seedStates(): States {
   return {
-    ramp: { '2026-01-01': 'approved', '2026-02-10': 'pending' },
-    tata: { '2026-01-09': 'approved' },
-    jaguar: { '2026-01-16': 'approved', '2026-01-17': 'approved', '2026-01-19': 'refused' },
-    asics: { '2026-01-08': 'approved', '2026-01-09': 'refused', '2026-01-23': 'pending' },
-    miles: { '2026-02-02': 'pending', '2026-02-03': 'pending' },
-    roulette: { '2026-01-15': 'approved' },
-    cross: { '2026-03-10': 'refused' },
+    ramp: {
+      '2026-01-01': { state: 'approved', source: 'bid' },
+      '2026-02-10': { state: 'pending', source: 'bid' },
+    },
+    // TATA's OIL came in through Raptor's input tab: he asked verbally, was
+    // told yes, and it arrived here already approved. Nothing in Leave War
+    // may edit or re-decide it.
+    tata: { '2026-01-09': { state: 'approved', source: 'raptor' } },
+    jaguar: {
+      '2026-01-16': { state: 'approved', source: 'bid' },
+      '2026-01-17': { state: 'approved', source: 'bid' },
+      '2026-01-19': { state: 'refused', source: 'bid' },
+    },
+    asics: {
+      '2026-01-08': { state: 'approved', source: 'bid' },
+      '2026-01-09': { state: 'refused', source: 'bid' },
+      '2026-01-23': { state: 'pending', source: 'bid' },
+    },
+    // MILES asked for the 4th and management moved him to the 3rd. A shift
+    // lands PENDING — moving it is a proposal, and someone still has to
+    // approve the date it was moved to.
+    miles: {
+      '2026-02-02': { state: 'pending', source: 'bid' },
+      '2026-02-03': { state: 'pending', source: 'bid', shiftedFrom: '2026-02-04' },
+    },
+    roulette: { '2026-01-15': { state: 'approved', source: 'bid' } },
+    cross: { '2026-03-10': { state: 'refused', source: 'bid' } },
   }
 }

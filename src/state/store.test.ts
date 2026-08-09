@@ -141,7 +141,7 @@ describe('initStore subscriber contract', () => {
 describe('bids', () => {
   it('makes a new leave cell pending by itself', () => {
     setCell('ramp', '2026-02-02', 'LL')
-    expect(getState().states.ramp['2026-02-02']).toBe('pending')
+    expect(getState().states.ramp['2026-02-02']?.state).toBe('pending')
   })
 
   it('gives a non-bid code no state at all', () => {
@@ -165,7 +165,7 @@ describe('bids', () => {
     setCell('ramp', '2026-02-06', 'LL')
     setBidState('ramp', '2026-02-06', 'approved')
     setCell('ramp', '2026-02-06', 'LL')
-    expect(getState().states.ramp['2026-02-06']).toBe('approved')
+    expect(getState().states.ramp['2026-02-06']?.state).toBe('approved')
   })
 
   // Changing WHAT was asked for is a new ask. Re-typing LL over an approved
@@ -175,13 +175,13 @@ describe('bids', () => {
     setCell('ramp', '2026-02-06', 'LL')
     setBidState('ramp', '2026-02-06', 'approved')
     setCell('ramp', '2026-02-06', 'OL')
-    expect(getState().states.ramp['2026-02-06']).toBe('pending')
+    expect(getState().states.ramp['2026-02-06']?.state).toBe('pending')
   })
 
   it('records a decision', () => {
     setCell('ramp', '2026-02-07', 'LL')
     setBidState('ramp', '2026-02-07', 'refused')
-    expect(getState().states.ramp['2026-02-07']).toBe('refused')
+    expect(getState().states.ramp['2026-02-07']?.state).toBe('refused')
   })
 
   // The one invariant the parallel map exists to keep: a state never lives
@@ -207,7 +207,7 @@ describe('bids', () => {
     setCell('ramp', '2026-02-09', 'LL')
     setBidState('ramp', '2026-02-09', 'approved')
     initStore(backend)
-    expect(getState().states.ramp['2026-02-09']).toBe('approved')
+    expect(getState().states.ramp['2026-02-09']?.state).toBe('approved')
   })
 
   // States are seeded only alongside a seeded grid, so with no grid stored
@@ -222,7 +222,7 @@ describe('bids', () => {
     expect(Array.isArray(getState().states)).toBe(false)
     // Asserted against a seed-only value, same as the grid fallbacks above —
     // a fallback to `{}` would otherwise pass this just as easily.
-    expect(getState().states.jaguar?.['2026-01-19']).toBe('refused')
+    expect(getState().states.jaguar?.['2026-01-19']?.state).toBe('refused')
   })
 
   // The last two shapes name a cell the stored grid really holds and really
@@ -254,7 +254,7 @@ describe('bids', () => {
     backend.write('grid', '{"jaguar":{"2026-01-19":"OL"}}')
     backend.write('states', '{"jaguar":{"2026-01-19":"refused"}}')
     initStore(backend)
-    expect(getState().states.jaguar['2026-01-19']).toBe('refused')
+    expect(getState().states.jaguar['2026-01-19']?.state).toBe('refused')
   })
 
   // The parallel map's one weakness is drift, and load is where it can
@@ -332,5 +332,83 @@ describe('the stored stage', () => {
       initStore(backend)
       expect(getState().period.stage).toBe(stage)
     }
+  })
+})
+
+describe('the stored bid record', () => {
+  // Bids written by a build that predates sources are BARE STRINGS. Rejecting
+  // them would degrade a squadron's real decisions to the seed to gain
+  // nothing, so they are migrated instead. A string could only ever have
+  // meant a bid placed here, so `source: 'bid'` is a fact, not a guess.
+  it('migrates a bare string state written by an earlier build', () => {
+    const backend = memoryBackend()
+    backend.write('grid', '{"jaguar":{"2026-01-19":"OL"}}')
+    backend.write('states', '{"jaguar":{"2026-01-19":"refused"}}')
+    initStore(backend)
+    expect(getState().states.jaguar['2026-01-19']).toEqual({ state: 'refused', source: 'bid' })
+  })
+
+  it('round-trips a source and a shift through storage', () => {
+    const backend = memoryBackend()
+    backend.write('grid', '{"jaguar":{"2026-01-19":"OL","2026-01-20":"LL"}}')
+    backend.write('states', JSON.stringify({
+      jaguar: {
+        '2026-01-19': { state: 'approved', source: 'raptor' },
+        '2026-01-20': { state: 'pending', source: 'bid', shiftedFrom: '2026-01-21' },
+      },
+    }))
+    initStore(backend)
+    expect(getState().states.jaguar['2026-01-19']).toEqual({ state: 'approved', source: 'raptor' })
+    expect(getState().states.jaguar['2026-01-20']).toEqual({
+      state: 'pending', source: 'bid', shiftedFrom: '2026-01-21',
+    })
+  })
+
+  // Each shape names a cell the stored grid really holds and really is a bid,
+  // so an accepted value would survive `reconcile` and land in `states` —
+  // that is what makes these bite rather than pass vacuously through pruning.
+  it.each([
+    ['a source nobody defined', '{"jaguar":{"2026-01-19":{"state":"approved","source":"telepathy"}}}'],
+    ['a record with no source at all', '{"jaguar":{"2026-01-19":{"state":"approved"}}}'],
+    ['a state nobody defined', '{"jaguar":{"2026-01-19":{"state":"maybe","source":"bid"}}}'],
+    ['a non-string shiftedFrom', '{"jaguar":{"2026-01-19":{"state":"pending","source":"bid","shiftedFrom":7}}}'],
+    ['a leaf that is neither string nor record', '{"jaguar":{"2026-01-19":123}}'],
+  ])('discards stored states holding %s, keeping the stored grid', (_label, raw) => {
+    const backend = memoryBackend()
+    backend.write('grid', '{"jaguar":{"2026-01-19":"OL"}}')
+    backend.write('states', raw)
+    initStore(backend)
+    expect(getState().grid.jaguar['2026-01-19']).toBe('OL')
+    expect(getState().states.jaguar?.['2026-01-19']).toBeUndefined()
+  })
+
+  // Deciding is the second half of a shift. Losing the provenance at exactly
+  // the moment management approves the date they moved it to would make the
+  // trail useless.
+  it('keeps the source and the shift when a decision is recorded', () => {
+    const backend = memoryBackend()
+    backend.write('grid', '{"jaguar":{"2026-01-20":"LL"}}')
+    backend.write('states', JSON.stringify({
+      jaguar: { '2026-01-20': { state: 'pending', source: 'bid', shiftedFrom: '2026-01-21' } },
+    }))
+    initStore(backend)
+    setBidState('jaguar', '2026-01-20', 'approved')
+    expect(getState().states.jaguar['2026-01-20']).toEqual({
+      state: 'approved', source: 'bid', shiftedFrom: '2026-01-21',
+    })
+  })
+
+  // Replacing WHAT was asked for replaces the whole ask. The shift belonged
+  // to the bid that has just been overwritten, so it must not survive onto
+  // a different one.
+  it('drops the shift record when the bid is changed to different leave', () => {
+    const backend = memoryBackend()
+    backend.write('grid', '{"jaguar":{"2026-01-20":"LL"}}')
+    backend.write('states', JSON.stringify({
+      jaguar: { '2026-01-20': { state: 'pending', source: 'bid', shiftedFrom: '2026-01-21' } },
+    }))
+    initStore(backend)
+    setCell('jaguar', '2026-01-20', 'OL')
+    expect(getState().states.jaguar['2026-01-20']).toEqual({ state: 'pending', source: 'bid' })
   })
 })

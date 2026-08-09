@@ -1,21 +1,68 @@
-// A bid is a code plus a state. The code lives in the Grid; the state lives
-// here, in a parallel map keyed the same way.
+// A bid is a code plus a record of what has happened to it. The code lives in
+// the Grid; the record lives here, in a parallel map keyed the same way.
 //
 // Why parallel rather than making a cell an object: the Grid's shape is what
 // storage, the matrix and every engine consumer already read, and widening it
-// would touch all of them for a field that only some cells have. The cost of
+// would touch all of them for fields that only some cells have. The cost of
 // the parallel map is that the two can drift, which is why `setCell` owns
 // both and is the only thing allowed to write either.
+//
+// Why ONE record rather than a second and third parallel map for source and
+// provenance: those facts are written and cleared with the state, never
+// apart from it, so keeping them together makes the drift unrepresentable
+// instead of merely policed. `reconcile()` in the store guards the one seam
+// that remains, which is load.
 
 import { codeOf } from './codes'
 
 export type BidState = 'pending' | 'approved' | 'refused'
 
-/** `personId -> date -> state`. Sparse: only bid cells appear. */
-export type States = Record<string, Record<string, BidState>>
+/** Which system last wrote this cell.
+ *
+ *  `raptor` means the leave was entered directly in Raptor's input tab,
+ *  which means the person sought approval verbally and already has it. */
+export type BidSource = 'bid' | 'raptor'
 
-export function stateOf(states: States, personId: string, date: string): BidState | undefined {
+export interface BidRecord {
+  state: BidState
+  /** The last authority to write this cell, NOT where it first came from. A
+   *  cell round-trips — bid, approved, out to Raptor, edited there, back —
+   *  and after that last step Raptor is what owns it. */
+  source: BidSource
+  /** The date management moved this bid from, when they shifted it. Absent
+   *  on a bid that landed where it was asked for. */
+  shiftedFrom?: string
+}
+
+/** `personId -> date -> record`. Sparse: only bid cells appear. */
+export type States = Record<string, Record<string, BidRecord>>
+
+export function recordOf(states: States, personId: string, date: string): BidRecord | undefined {
   return states[personId]?.[date]
+}
+
+/** Kept returning a bare `BidState` on purpose. Every existing consumer —
+ *  `removesAvailability`, the count rows, the chip colour — asks only what
+ *  was decided, and none of them should have to learn about the record to
+ *  keep asking it. */
+export function stateOf(states: States, personId: string, date: string): BidState | undefined {
+  return recordOf(states, personId, date)?.state
+}
+
+export function sourceOf(states: States, personId: string, date: string): BidSource | undefined {
+  return recordOf(states, personId, date)?.source
+}
+
+/** The question every write path asks first. Raptor owns what Raptor last
+ *  wrote: it is edited in Raptor's input tab and syncs back here, so editing
+ *  it here would leave the two systems disagreeing — which is the single
+ *  failure this whole model exists to prevent. */
+export function raptorOwns(states: States, personId: string, date: string): boolean {
+  return sourceOf(states, personId, date) === 'raptor'
+}
+
+export function shiftedFrom(states: States, personId: string, date: string): string | undefined {
+  return recordOf(states, personId, date)?.shiftedFrom
 }
 
 /** Whether a person bids for this code at all. Medical, courses and duty

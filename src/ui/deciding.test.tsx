@@ -32,7 +32,7 @@ describe('deciding a bid', () => {
     render(<Matrix />)
     fireEvent.click(screen.getByTestId(PENDING))
     fireEvent.click(screen.getByTestId('decide-approve'))
-    expect(getState().states.asics['2026-01-23']).toBe('approved')
+    expect(getState().states.asics['2026-01-23']?.state).toBe('approved')
   })
 
   it('refuses a pending bid, and the man returns to the counts', () => {
@@ -41,7 +41,7 @@ describe('deciding a bid', () => {
     const before = screen.getByTestId('count-opsp-2026-01-23').textContent
     fireEvent.click(screen.getByTestId(PENDING))
     fireEvent.click(screen.getByTestId('decide-refuse'))
-    expect(getState().states.asics['2026-01-23']).toBe('refused')
+    expect(getState().states.asics['2026-01-23']?.state).toBe('refused')
     expect(screen.getByTestId('count-opsp-2026-01-23').textContent).not.toBe(before)
   })
 
@@ -62,7 +62,7 @@ describe('deciding a bid', () => {
     fireEvent.click(screen.getByTestId('decide-refuse'))
     fireEvent.click(screen.getByTestId(PENDING))
     fireEvent.click(screen.getByTestId('decide-approve'))
-    expect(getState().states.asics['2026-01-23']).toBe('approved')
+    expect(getState().states.asics['2026-01-23']?.state).toBe('approved')
   })
 
   it('offers nothing on a cell nobody bid for', () => {

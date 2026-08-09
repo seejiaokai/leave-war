@@ -82,8 +82,46 @@ describe('seed', () => {
 
 describe('seedStates', () => {
   it('shows all three states so the screen exercises every colour', () => {
-    const seen = new Set(Object.values(seedStates()).flatMap(r => Object.values(r)))
+    const seen = new Set(Object.values(seedStates()).flatMap(r => Object.values(r).map(v => v.state)))
     expect(seen).toEqual(new Set(['pending', 'approved', 'refused']))
+  })
+
+  // Both sources have to render on first run for the same reason all three
+  // states do: nobody can judge a surface that never appears.
+  it('shows a cell Raptor owns as well as ones the squadron bid for', () => {
+    const seen = new Set(Object.values(seedStates()).flatMap(r => Object.values(r).map(v => v.source)))
+    expect(seen).toEqual(new Set(['bid', 'raptor']))
+  })
+
+  // A Raptor input IS the approval — the person asked verbally and was told
+  // yes before Leave War ever saw it. A seeded raptor cell in any other
+  // state would be a shape the store refuses to write.
+  it('never seeds a raptor cell that is not approved', () => {
+    for (const [id, row] of Object.entries(seedStates())) {
+      for (const [date, record] of Object.entries(row)) {
+        if (record.source === 'raptor' && record.state !== 'approved') {
+          throw new Error(`raptor cell not approved: ${id} ${date}`)
+        }
+      }
+    }
+    const raptor = Object.values(seedStates()).flatMap(r => Object.values(r)).filter(v => v.source === 'raptor')
+    expect(raptor.length).toBeGreaterThan(0)
+  })
+
+  // A shift records the date it came from, and that date must be EMPTY in
+  // the grid — the bid moved off it. A shiftedFrom pointing at a cell that
+  // still holds a code would mean the move never happened.
+  it('seeds a shifted bid whose original date is now empty', () => {
+    const grid = seedGrid()
+    const shifted = Object.entries(seedStates()).flatMap(([id, row]) =>
+      Object.entries(row).filter(([, v]) => v.shiftedFrom).map(([date, v]) => ({ id, date, from: v.shiftedFrom! })),
+    )
+    expect(shifted.length).toBeGreaterThan(0)
+    for (const s of shifted) {
+      if (grid[s.id]?.[s.from]) throw new Error(`shiftedFrom still holds a code: ${s.id} ${s.from}`)
+      // A shift lands pending: management still has to approve where they moved it to.
+      expect(seedStates()[s.id][s.date].state).toBe('pending')
+    }
   })
 
   it('never records a state for a cell that has no code', () => {

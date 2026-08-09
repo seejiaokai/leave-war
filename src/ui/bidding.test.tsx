@@ -24,7 +24,7 @@ describe('placing a bid', () => {
     fireEvent.click(screen.getByTestId(CELL))
     fireEvent.click(screen.getByTestId('bid-LL'))
     expect(getState().grid.dusk['2026-02-11']).toBe('LL')
-    expect(getState().states.dusk['2026-02-11']).toBe('pending')
+    expect(getState().states.dusk['2026-02-11']?.state).toBe('pending')
   })
 
   it('closes once a choice is made', () => {

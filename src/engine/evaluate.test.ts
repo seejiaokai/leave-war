@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Grid } from './availability'
+import type { States } from './bids'
 import { evaluateDay, evaluatePeriod, worst } from './evaluate'
 import type { Person } from './people'
 import type { Requirements } from './requirements'
@@ -108,7 +109,7 @@ describe('evaluateDay and the bid state', () => {
   it('lets a refusal pull a day back from red', () => {
     const grid: Grid = { ip1: { [D]: 'LL' }, ip2: { [D]: 'LL' } }
     expect(evaluateDay(people, grid, {}, reqs, D).results.find(r => r.ruleId === 'ip')!.verdict).toBe('red')
-    const states = { ip1: { [D]: 'refused' as const } }
+    const states: States = { ip1: { [D]: { state: 'refused', source: 'bid' } } }
     expect(evaluateDay(people, grid, states, reqs, D).results.find(r => r.ruleId === 'ip')!.verdict).toBe('amber')
   })
 
@@ -117,7 +118,10 @@ describe('evaluateDay and the bid state', () => {
   // single-day test above.
   it('carries the states into every day of a period, not only the first', () => {
     const grid: Grid = { ip1: { '2026-01-05': 'LL' }, ip2: { '2026-01-06': 'LL' } }
-    const states = { ip1: { '2026-01-05': 'refused' as const }, ip2: { '2026-01-06': 'refused' as const } }
+    const states: States = {
+      ip1: { '2026-01-05': { state: 'refused', source: 'bid' } },
+      ip2: { '2026-01-06': { state: 'refused', source: 'bid' } },
+    }
     const out = evaluatePeriod(people, grid, states, reqs, ['2026-01-05', '2026-01-06'])
     expect(out['2026-01-05'].counts.byCategory.IP).toBe(2)
     expect(out['2026-01-06'].counts.byCategory.IP).toBe(2)
