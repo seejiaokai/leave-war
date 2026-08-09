@@ -81,15 +81,21 @@ export function seedRequirements(): Requirements {
   }
 }
 
+// `HO` (half OIL) becomes `*OIL` — the morning reading, picked arbitrarily
+// since the old code carried no time-of-day information to preserve. A bare
+// `AM`/`PM` in the source sheet meant half a day of ordinary leave, so those
+// become `*LL`/`LL*` respectively: same leave type, the portion the old code
+// name was already naming. All three keep removing exactly 0.5 of a person,
+// so the manning figures this grid produces are unchanged.
 export function seedGrid(): Grid {
   return {
-    ramp: { '2026-01-01': 'OL', '2026-01-03': 'FS', '2026-02-10': 'HO' },
+    ramp: { '2026-01-01': 'OL', '2026-01-03': 'FS', '2026-02-10': '*OIL' },
     tata: { '2026-01-01': 'FS', '2026-01-04': 'FS', '2026-01-09': 'OIL' },
     splice: { '2026-01-05': 'M', '2026-01-06': 'M', '2026-01-08': 'LL' },
     jaguar: { '2026-01-16': 'OL', '2026-01-17': 'OL', '2026-01-19': 'OL' },
-    asics: { '2026-01-08': 'LL', '2026-01-09': 'LL', '2026-01-23': 'AM' },
+    asics: { '2026-01-08': 'LL', '2026-01-09': 'LL', '2026-01-23': '*LL' },
     pipper: { '2026-01-12': 'CSE', '2026-01-13': 'CSE' },
-    miles: { '2026-02-02': 'LL', '2026-02-03': 'PM' },
+    miles: { '2026-02-02': 'LL', '2026-02-03': 'LL*' },
     roulette: { '2026-01-15': 'CCL' },
     cross: { '2026-03-10': 'LL' },
     skin: { '2026-01-03': 'HS' },
