@@ -2,11 +2,15 @@
 
 > ## ✅ EXECUTED, 9 Aug 26 — kept for the reasoning, not as instructions
 >
-> All nine tasks are done and on `claude/bidding-plan-continuation-vqnrfz`.
-> Execution departed from this plan in four further places beyond the five
-> staleness notes below; `docs/RESUME.md` lists them under "Where the bidding
-> plan and the code differ". Read that before treating any code block here as
-> current.
+> All nine tasks are done and on `claude/bidding-plan-continuation-vqnrfz`,
+> and a later branch has since moved past it again — bid states now carry a
+> source and a shift record, `canBid` has become `canEdit(stage, role)`, and
+> `States` holds a record rather than a bare state string.
+>
+> **Nearly every code block below is now stale.** Read
+> `docs/superpowers/specs/2026-08-09-leave-war-design.md` for what is true and
+> `docs/RESUME.md` for where things stand. This file is kept for its
+> reasoning, not as a description of the code.
 
 > ## ⚠ STALE IN FIVE PLACES — the notes that applied while executing
 >

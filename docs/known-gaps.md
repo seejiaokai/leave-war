@@ -20,19 +20,34 @@ Everything is built to make that change small: all persistence goes through one
 module (`src/state/storage.ts`), and every write goes through one function
 (`setCell`). Nothing else in the codebase touches either.
 
-Storage now holds three keys, not one: `grid`, `states` and `stage`. They are
-written together by a single `persist()` so no path can save one and forget
-another, and `initStore` reconciles the first two on load — a stored state
-whose cell no longer holds a bid is dropped rather than left to colour the
-wrong cell. Seeded states are attached only to a seeded grid, never to a grid
-the squadron has already written.
+Storage now holds six keys, not one: `grid`, `states`, `stage`, `role`,
+`openings` and `ledger`. They are written together by a single `persist()` so
+no path can save one and forget another, and `initStore` reconciles grid and
+states on load — a stored state whose cell no longer holds a bid is dropped
+rather than left to colour the wrong cell. Seeded states are attached only to
+a seeded grid, never to a grid the squadron has already written.
 
-## Approval is not guarded, and there is no "me"
+Stored states written before bids carried a source are **bare strings**, and
+they are migrated on load rather than rejected: a string could only ever have
+meant a bid placed here, so `source: 'bid'` is a fact and not a guess.
+Rejecting them would have degraded a squadron's real decisions to the seed to
+gain nothing.
 
-Anyone using this prototype can approve or refuse anyone's bid, and anyone can
-bid on anyone's row. There is no login, no role and no signed-in person, which
-follows from deferring accounts to the backend (owner, 9 Aug 26). **Do not
-present this as a security model** — it is the absence of one.
+## The role switch is an affordance, not a permission
+
+The interface now has a MEMBER/ADMIN switch, and **anyone can flip it**.
+There is no login, so nothing verifies which one a person is: the switch
+decides which controls appear and nothing else. Closing the war genuinely
+locks members out of editing *in the interface*; it does not stop anyone who
+flips the switch.
+
+This is the spec's own two-role model (§Roles) built ahead of the accounts
+that will enforce it, in the same way approval was. **Do not present it as a
+security model** — it is the shape a real one will take, with the check
+missing.
+
+Everything else that follows from having no accounts still holds: anyone can
+approve, refuse or shift anyone's bid, and anyone can bid on anyone's row.
 
 The bidding plan called for a fixed `ME` roster entry standing in for a
 session. That was not built: the tests bid on whichever row was clicked, so an
@@ -40,6 +55,36 @@ session. That was not built: the tests bid on whichever row was clicked, so an
 not exist. A real one arrives with accounts. Until then the app is honest
 about being a scheduler's view of everybody rather than a bidder's view of
 themselves.
+
+## What balances do not yet do
+
+Balances are computed and on screen. Three parts of §Counters are not built:
+
+- **Earned OIL.** The automatic-OIL rule turns on knock-off time — later than
+  14:30 credits 1.0, at or before credits 0.5 — and **nothing in this app
+  carries a knock-off time**. So a balance is `opening + grants − drawn` and
+  never `+ earned`. This is blocked on data, not effort, and it is the reason
+  step 5 of the build order is only half done.
+- **No grant sheet.** The ledger is seeded and read; nothing can post a
+  top-up, an award or a correction through the interface.
+- **No ledger view.** §Counters promises that any number on screen can be
+  opened and explained. It cannot yet: the counter column shows the figure
+  and the tooltip says what it counts, but the entries behind it are not
+  visible anywhere.
+
+Also note the derivation, because it narrows the spec deliberately: §Counters
+says every change to a counter is a ledger entry, and **leave taken is not
+posted to the ledger here**. The grid is already that record, and a second
+copy of it would be a second version of the truth. The ledger holds only what
+the grid cannot know.
+
+## The RAPTOR clash has nowhere to go
+
+`ingestFromRaptor` returns `clash` when an inbound input lands on a date the
+squadron already bid differently, and **nothing displays it**. The value is
+returned to the caller and dropped, because until the wire exists the only
+caller is a test. The rule is right and tested; the surface it needs does not
+exist. Build it with the wire, not before.
 
 ## The geometry gate claims less than it appears to
 
@@ -102,13 +147,14 @@ test code needs to change.
   clean it up. Harmless while every other test passes an explicit backend and
   none calls bare `initStore()` — it becomes a cross-test dependency the day one
   does. Now slightly larger a trap than it was, since a bare `initStore()`
-  would read `leavewar:states` and `leavewar:stage` from the same store.
-- The DOM ceiling in the geometry gate is 2500 against a measured 2330.
+  would read `leavewar:states`, `leavewar:stage`, `leavewar:role`,
+  `leavewar:openings` and `leavewar:ledger` from the same store.
+- The DOM ceiling in the geometry gate is 2500 against a measured 2357.
   Raising it is meant to be a deliberate edit in whichever change adds the
   nodes, not a reflex when it goes red. Note the selector's blind spot: it
   counts `.mx *`, and the bid sheet renders outside the table, so it adds
   nothing to that figure. The same test therefore also counts the whole
-  document with the sheet open (2384, ceiling 2600).
+  document with the sheet open (2413, ceiling 2600).
 - `setCell` stores an empty row object for a person whose last state is
   cleared, so `states.ramp` can be `{}` rather than absent. Every reader uses
   `stateOf`, which is indifferent, and `initStore` prunes empty rows on the

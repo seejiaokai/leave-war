@@ -171,12 +171,38 @@ Two roles, matching RAPTOR's prototype split:
 - **Member** — bids for themselves, sees the whole matrix and everyone's bids,
   as they do in the shared spreadsheet today.
 - **Admin** — the scheduler and management functions: building the period,
-  requirements, events, blocked days, approving and refusing bids, ledger
-  grants, and the roster.
+  requirements, events, blocked days, approving, refusing and shifting bids,
+  ledger grants, and the roster.
 
-Splitting scheduler from management is a real distinction the owner draws in
-conversation, but enforcing it needs real accounts. It waits for the backend
-rather than being faked now.
+**Settled, 9 Aug 26: there is no third role.** The scheduler and management
+both hold the admin account — "what I mean is they have an admin account"
+(owner). The split between them that this document once deferred is not a
+split at all, so the two roles above are the whole model.
+
+**The edit lock is what closing does.** While the war is open a member edits
+their own leave; once the admin closes it the sheet is view-only for the
+squadron, while the admin keeps editing so the picture can still be
+corrected. That is one rule (`canEdit(stage, role)`), not a separate lock
+that could be left unapplied.
+
+Nothing verifies which role a person is — there is no login — so the switch
+in the interface decides which controls appear and nothing else. See
+`docs/known-gaps.md`.
+
+### Periods
+
+**Settled, 9 Aug 26.** A period is a **date range the admin chooses**,
+selectable down to a single month. A quarter is the common case — the
+reference workbook is quarterly, and the seed runs Jan–Mar — but it is not a
+constraint. The admin opens one when the schedule firms up rather than on any
+calendar trigger.
+
+Two things follow. The engine already models this correctly: `Period` carries
+free `start`/`end` strings and `buildDays` builds any span, so a month-length
+period needs no engine change. What is missing is **multiplicity and
+selection** — for "which period to open" to be a choice, more than one has to
+exist, and today there is exactly one with no picker. That is the next piece
+of work, not something the bidding or balances phases built.
 
 ## The rules engine
 
@@ -204,6 +230,18 @@ broken rule is enough.
 
 **Availability is fractional.** A half-day code removes 0.5 of a person, not
 1.0. This is the single largest behavioural difference from the spreadsheet.
+
+### Shifting a bid
+
+**Added 9 Aug 26.** Management's third answer, beside approve and refuse:
+**move the bid to another date**. It is what they reach for when a week goes
+red and refusing outright is too blunt.
+
+A shift lands **pending, not approved**, and records the date it came from.
+Moving a bid is a proposal with a trail — someone still approves the date it
+was moved to — and a leave date that changed with no trace is exactly the
+untraceable edit the OIL ledger exists to end. A shift never overwrites: a
+destination that already holds a code is refused, with the reason shown.
 
 ### Bidding against the rules
 
@@ -324,7 +362,35 @@ Designed for from the start, built later:
 The integration the owner wants: **an approved leave becomes a personal input
 on the schedule automatically**, arriving for the scheduler to accept through
 RAPTOR's existing accept-an-input path. And RAPTOR's approved schedule drives
-the automatic OIL crediting described above. Neither is built in this phase.
+the automatic OIL crediting described above. Neither wire is built yet.
+
+### The inbound direction
+
+**Added 9 Aug 26**, and absent from this document until then — it described
+only the outward path.
+
+Leave entered **directly on RAPTOR's input tab** means the person sought
+approval **verbally and already has it**. So it arrives here already
+approved, green, without anyone deciding anything in the leave war. Members
+do this for themselves as well as schedulers doing it for them, and either
+way it syncs back.
+
+The two systems therefore need to agree about **who owns a cell**. RAPTOR
+owns what RAPTOR last wrote: the leave war refuses to edit, decide or shift
+those cells and says so, because changing one here would leave the two
+disagreeing. Source tracks the last authority to write, not the origin — a
+cell round-trips (bid, approved, out to RAPTOR, edited there, back), and
+after that last step RAPTOR owns it.
+
+The existing clash rule applies unchanged: an inbound input landing on a date
+the squadron already bid differently **never overwrites**; it raises the
+clash for a human. An identical code is not a clash — that is RAPTOR
+confirming what was asked, so the cell is upgraded in place.
+
+Outbound is **derived, not queued**: the payload is every approved cell the
+squadron bid for, computed from the grid and the states. A queue would be a
+second record of a fact the grid already holds, and a bid refused after being
+queued would sit there waiting to be sent.
 
 ## Build order
 
@@ -335,3 +401,9 @@ Each step usable before the next begins:
 3. Bidding and the cycle stages
 4. Approval
 5. Balances, the ledger, and automatic OIL
+
+Steps 1–4 are built. Step 5 is **half** built: balances, the counter list and
+the ledger's shape are done and on screen; the grant surface, the ledger view
+and **automatic OIL** are not. Automatic OIL is blocked on data rather than
+effort — the half/full rule turns on knock-off time and nothing in this app
+carries one.
