@@ -381,7 +381,7 @@ export function isDuty(code: string | undefined | null): boolean {
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `npx vitest run src/engine/codes.test.ts`
-Expected: PASS, 8 tests.
+Expected: PASS, 9 tests.
 
 - [ ] **Step 5: Commit**
 
