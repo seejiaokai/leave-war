@@ -59,7 +59,8 @@ export function StageBar() {
       {/* The control sits beside the stage it moves, so the strip reads as
           one thing rather than as a label and an unrelated button. It names
           the stage it will move TO — the label answers "what does this do",
-          which the current stage is already showing two chips to the left.
+          and the chip immediately to its left is already showing where the
+          period stands.
           Forward only, and disabled at the end of the cycle: `nextStage`
           owns which transitions exist and this asks it rather than deciding
           for itself. */}

@@ -312,3 +312,25 @@ describe('advanceStage', () => {
     expect(getState().period.stage).toBe('closed')
   })
 })
+
+describe('the stored stage', () => {
+  it.each([
+    ['a stage nobody defined', 'reopened'],
+    ['an empty string', ''],
+    ['something that is not a stage at all', '{"stage":"open"}'],
+  ])('falls back to the seeded stage when the backend holds %s', (_label, raw) => {
+    const backend = memoryBackend()
+    backend.write('stage', raw)
+    initStore(backend)
+    expect(getState().period.stage).toBe('open')
+  })
+
+  it('reloads every stage the cycle actually has', () => {
+    for (const stage of ['draft', 'open', 'closed', 'published']) {
+      const backend = memoryBackend()
+      backend.write('stage', stage)
+      initStore(backend)
+      expect(getState().period.stage).toBe(stage)
+    }
+  })
+})

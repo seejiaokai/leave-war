@@ -11,11 +11,13 @@ import {
   seedPeriod,
   seedRequirements,
   seedStates,
+  STAGE_ORDER,
   type BidState,
   type Grid,
   type Period,
   type Person,
   type Requirements,
+  type Stage,
   type States,
 } from '../engine'
 import { localBackend, memoryBackend, type StorageBackend } from './storage'
@@ -124,8 +126,12 @@ export function initStore(b?: StorageBackend): void {
   // would approve cells nobody bid for.
   state.states = reconcile(state.grid, storedGrid ? read('states', isValidStates) ?? {} : seedStates())
 
-  const storedStage = backend.read('stage')
-  if (storedStage === 'draft' || storedStage === 'open' || storedStage === 'closed' || storedStage === 'published') {
+  // Asked of STAGE_ORDER rather than compared against a second copy of the
+  // four names, so a stage added to the cycle cannot become one this refuses
+  // to reload. Anything else stored here is not a stage, and the seed's is a
+  // better answer than a period stuck in a state nothing can leave.
+  const storedStage = backend.read('stage') as Stage | null
+  if (storedStage && STAGE_ORDER.includes(storedStage)) {
     state.period = { ...state.period, stage: storedStage }
   }
 

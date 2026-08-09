@@ -1,6 +1,14 @@
 # LEAVE WAR — Bidding, the Cycle Stages and Approval
 
-> ## ⚠ STALE IN FIVE PLACES — read before executing
+> ## ✅ EXECUTED, 9 Aug 26 — kept for the reasoning, not as instructions
+>
+> All nine tasks are done and on `claude/bidding-plan-continuation-vqnrfz`.
+> Execution departed from this plan in four further places beyond the five
+> staleness notes below; `docs/RESUME.md` lists them under "Where the bidding
+> plan and the code differ". Read that before treating any code block here as
+> current.
+
+> ## ⚠ STALE IN FIVE PLACES — the notes that applied while executing
 >
 > This plan was written **before** the leave-code rework landed (9 Aug 26).
 > `AM`, `PM`, `HO` and `HL` no longer exist as codes, and `CODES` is no longer
@@ -58,7 +66,7 @@ Every task's requirements implicitly include these.
 - Consumes: `codeOf` from `./codes`
 - Produces: `BidState`, `States`, `stateOf(states, personId, date)`, `isBiddable(code)`, `removesAvailability(code, state)`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `src/engine/bids.test.ts`:
 
@@ -122,12 +130,12 @@ describe('removesAvailability', () => {
 })
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `npx vitest run src/engine/bids.test.ts`
 Expected: FAIL — cannot resolve `./bids`.
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 `src/engine/bids.ts`:
 
@@ -179,12 +187,12 @@ Add to `src/engine/index.ts`, keeping the list alphabetical:
 export * from './bids'
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `npx vitest run src/engine/bids.test.ts`
 Expected: PASS, 9 tests.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/engine/bids.ts src/engine/bids.test.ts src/engine/index.ts
@@ -205,7 +213,7 @@ git commit -m "feat(engine): bid states, and what a refused bid means for mannin
 
 This is a **breaking signature change**. Every existing caller passes `states`; the existing tests pass `{}` and must keep asserting exactly what they assert today. Do not weaken an assertion to accommodate the new parameter.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Append to `src/engine/availability.test.ts`:
 
@@ -259,12 +267,12 @@ describe('evaluateDay and the bid state', () => {
 })
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `npx vitest run src/engine/availability.test.ts src/engine/evaluate.test.ts`
 Expected: FAIL — wrong argument counts and unknown parameters.
 
-- [ ] **Step 3: Change `availability.ts`**
+- [x] **Step 3: Change `availability.ts`**
 
 Replace the `availabilityOf` and `countsFor` signatures and bodies. The duty short-circuit must still run before anything else, and the `inSquadron` guard on the duty tally must stay:
 
@@ -295,7 +303,7 @@ export function countsFor(people: Person[], grid: Grid, states: States, date: st
 }
 ```
 
-- [ ] **Step 4: Change `evaluate.ts`**
+- [x] **Step 4: Change `evaluate.ts`**
 
 Thread `states` through both functions, immediately after `grid`:
 
@@ -324,16 +332,16 @@ export function evaluatePeriod(
 }
 ```
 
-- [ ] **Step 5: Update every existing caller**
+- [x] **Step 5: Update every existing caller**
 
 Pass `{}` in the existing engine tests and `seed.test.ts`. In `src/ui/Matrix.tsx` pass `states` from the store (Task 4 adds it; until then pass `{}` and fix it in Task 4 — note this in your report so the next task knows).
 
-- [ ] **Step 6: Run the full suite**
+- [x] **Step 6: Run the full suite**
 
 Run: `npx vitest run && npm run build`
 Expected: all green. Every previously passing assertion must still pass unchanged.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/engine/ src/ui/
@@ -353,7 +361,7 @@ git commit -m "feat(engine): a refused bid removes nobody from the manning pictu
 - Consumes: `Stage` from `./period`
 - Produces: `STAGE_ORDER`, `nextStage(stage)`, `canBid(stage)`, `canDecide(stage)`, `stageLabel(stage)`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `src/engine/stages.test.ts`:
 
@@ -395,12 +403,12 @@ describe('what each stage allows', () => {
 })
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `npx vitest run src/engine/stages.test.ts`
 Expected: FAIL — cannot resolve `./stages`.
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 `src/engine/stages.ts`:
 
@@ -446,12 +454,12 @@ export function stageLabel(stage: Stage): string {
 
 Add `export * from './stages'` to `src/engine/index.ts`.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `npx vitest run src/engine/stages.test.ts`
 Expected: PASS, 5 tests.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/engine/stages.ts src/engine/stages.test.ts src/engine/index.ts
@@ -472,7 +480,7 @@ git commit -m "feat(engine): forward-only stage transitions and what each allows
 
 `setCell` gains a second responsibility and it is the point of the design: **a cell and its state are written and cleared together.** A cell written with a biddable code becomes `pending`; a cell cleared, or overwritten with a non-bid code, loses its state. Nothing else may write `states`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `src/state/store.test.ts`:
 
@@ -556,12 +564,12 @@ describe('advanceStage', () => {
 
 Import `setBidState` and `advanceStage` alongside the existing imports.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `npx vitest run src/state/store.test.ts`
 Expected: FAIL — `setBidState` is not exported.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `src/state/store.ts`: add `states: States` to `State` and to `blank()` (seeded by `seedStates()`, which Task 5 adds — until then `{}`); add a `loadStates()` mirroring `loadGrid()`'s guard, validating a map of maps of the three known state strings; persist `states` alongside `grid` on every write.
 
@@ -605,12 +613,12 @@ export function advanceStage(): void {
 
 Add a small `persist()` that writes both keys, so no write path can forget one.
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 Run: `npx vitest run src/state/store.test.ts && npx vitest run && npm run build`
 Expected: all green.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/state/
@@ -630,7 +638,7 @@ git commit -m "feat(state): bids and stages, written through the one funnel"
 
 The screen must show all three bid colours on first run, or nobody can judge the design. Seed states for cells that already exist in `seedGrid()` — never for a cell that does not.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `src/engine/seed.test.ts`:
 
@@ -663,12 +671,12 @@ describe('seedStates', () => {
 })
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `npx vitest run src/engine/seed.test.ts`
 Expected: FAIL — `seedStates` is not exported.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Append to `src/engine/seed.ts`:
 
@@ -690,12 +698,12 @@ export function seedStates(): States {
 }
 ```
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 Run: `npx vitest run src/engine/seed.test.ts && npx vitest run`
 Expected: all green.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/engine/seed.ts src/engine/seed.test.ts
@@ -713,7 +721,7 @@ git commit -m "feat(engine): seed all three bid states so every colour renders"
 **Interfaces:**
 - Consumes: `stateOf`, `isBiddable` from `../engine`; `states` from the store
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `src/ui/matrix.test.tsx`:
 
@@ -734,12 +742,12 @@ describe('bid state on a cell', () => {
 })
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `npx vitest run src/ui/matrix.test.tsx`
 Expected: FAIL — no `appr` class.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `Matrix.tsx`, read `states` from `getState()`, pass it to `evaluatePeriod`, and replace the `chipState` derivation:
 
@@ -757,12 +765,12 @@ const chipState = !here || !code
   : 'info'
 ```
 
-- [ ] **Step 4: Run tests and build**
+- [x] **Step 4: Run tests and build**
 
 Run: `npx vitest run && npm run build`
 Expected: all green.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/ui/
@@ -786,7 +794,7 @@ While the period is open, clicking a cell opens a small picker of the codes a pe
 
 Bidding runs as a **fixed current user** — there is no login (see Global Constraints). Use the first person in the roster as "me", read from the store, and name it `ME` with a comment saying it is a stand-in for a real session.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `src/ui/bidding.test.tsx`:
 
@@ -840,12 +848,12 @@ describe('placing a bid', () => {
 })
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `npx vitest run src/ui/bidding.test.tsx`
 Expected: FAIL — no `bid-picker`.
 
-- [ ] **Step 3: Write `BidPicker.tsx`**
+- [x] **Step 3: Write `BidPicker.tsx`**
 
 ```tsx
 import { CODES, isBiddable } from '../engine'
@@ -875,16 +883,16 @@ export function BidPicker({ personId, date, onClose }: { personId: string; date:
 }
 ```
 
-- [ ] **Step 4: Wire it into `Matrix.tsx`**
+- [x] **Step 4: Wire it into `Matrix.tsx`**
 
 Hold `const [picking, setPicking] = useState<{ id: string; date: string } | null>(null)`. On a cell's `onClick`, open the picker only when `canBid(period.stage)`. Render `<BidPicker>` when `picking` is set. Style `.bidpop` in `matrix.css` using the existing panel tokens — `--panel`, `--edge`, `--r` — so it matches the rest.
 
-- [ ] **Step 5: Run tests and build**
+- [x] **Step 5: Run tests and build**
 
 Run: `npx vitest run && npm run build`
 Expected: all green.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/ui/
@@ -906,7 +914,7 @@ Once bidding has closed, clicking a pending cell offers Approve and Refuse. The 
 
 **No role check** — see Global Constraints. Anyone can decide. Do not add a permission gate or imply one exists.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `src/ui/deciding.test.tsx`:
 
@@ -969,23 +977,23 @@ describe('moving the period on', () => {
 })
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `npx vitest run src/ui/deciding.test.tsx`
 Expected: FAIL — no `decide-approve`.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Extend the cell click: when `canDecide(stage)` and the cell carries a bid state, open a decision popover with two buttons calling `setBidState`. Reuse the `.bidpop` styling. In `Chrome.tsx` add a button rendering `stageLabel(nextStage(stage))` — disabled when `nextStage` is null — calling `advanceStage`.
 
 The stage control must live where the stage is already shown, so the strip reads as one thing rather than a label and an unrelated button.
 
-- [ ] **Step 4: Run tests and build**
+- [x] **Step 4: Run tests and build**
 
 Run: `npx vitest run && npm run build`
 Expected: all green.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/ui/
@@ -999,7 +1007,7 @@ git commit -m "feat(ui): approve or refuse a bid, and walk the period forward"
 **Files:**
 - Modify: `e2e/matrix.spec.ts`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Append:
 
@@ -1021,16 +1029,16 @@ test('a bid can be placed and shows as pending', async ({ page }) => {
 })
 ```
 
-- [ ] **Step 2: Run the gate**
+- [x] **Step 2: Run the gate**
 
 Run: `npm run test:e2e`
 Expected: the two new tests fail before Tasks 6–8 land, pass after.
 
-- [ ] **Step 3: Check the node ceiling**
+- [x] **Step 3: Check the node ceiling**
 
 The picker adds nodes only while open. Measure `.mx *` and confirm it is under the ceiling; if the ceiling needs raising, do it deliberately with the new measured figure and the date in the comment.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add e2e/

@@ -20,10 +20,26 @@ Everything is built to make that change small: all persistence goes through one
 module (`src/state/storage.ts`), and every write goes through one function
 (`setCell`). Nothing else in the codebase touches either.
 
-**`setCell` has no production caller yet.** The matrix is read-only until the
-bidding plan lands, so the persist-and-reload path only ever runs in tests. Not
-a defect — a consequence worth knowing before someone concludes storage is
-broken because a reload shows the seed.
+Storage now holds three keys, not one: `grid`, `states` and `stage`. They are
+written together by a single `persist()` so no path can save one and forget
+another, and `initStore` reconciles the first two on load — a stored state
+whose cell no longer holds a bid is dropped rather than left to colour the
+wrong cell. Seeded states are attached only to a seeded grid, never to a grid
+the squadron has already written.
+
+## Approval is not guarded, and there is no "me"
+
+Anyone using this prototype can approve or refuse anyone's bid, and anyone can
+bid on anyone's row. There is no login, no role and no signed-in person, which
+follows from deferring accounts to the backend (owner, 9 Aug 26). **Do not
+present this as a security model** — it is the absence of one.
+
+The bidding plan called for a fixed `ME` roster entry standing in for a
+session. That was not built: the tests bid on whichever row was clicked, so an
+`ME` constant would have been dead code claiming an identity model that does
+not exist. A real one arrives with accounts. Until then the app is honest
+about being a scheduler's view of everybody rather than a bidder's view of
+themselves.
 
 ## The geometry gate claims less than it appears to
 
@@ -44,17 +60,26 @@ test code needs to change.
 ## Deliberately deferred to later plans
 
 - **The day's overall verdict is computed and not shown.** `evaluateDay`
-  produces a worst-across-all-rules verdict per day, and the interface currently
-  renders only the per-rule count rows. The engine behaviour is correct and
-  tested; nothing on screen yet summarises a day's standing. For the bidding
-  plan, where a bidder needs to be told what their bid would break.
-- **`Period.stage` is seeded and read by nothing.** The cycle stages — draft,
-  open, closed, published — are modelled but not enforced. The bidding plan is
-  what gives them meaning.
+  produces a worst-across-all-rules verdict per day, and the interface still
+  renders only the per-rule count rows. This was marked "for the bidding
+  plan", and the bidding plan did not do it: a bidder can watch the count
+  rows move as they bid, but nothing tells them in words what their bid
+  would break. Still outstanding, and now more clearly worth doing — the
+  bid sheet is the surface that would carry it.
 - **`title` tooltips do not exist on touch.** The blocked-day reason and the
-  count-row detail are `title` attributes, which a phone never shows. The spec's
-  promise that a bidder is told *why* a day is blocked needs a real surface, and
-  that arrives with bidding.
+  count-row detail are still `title` attributes, which a phone never shows.
+  Bidding added a real surface (the bid sheet) but did not move these onto
+  it. The spec's promise that a bidder is told *why* a day is blocked is
+  therefore still unkept on a phone.
+- **A cell is not reachable from the keyboard.** Bidding and deciding hang
+  off `onClick` on a `<td>`, which takes no focus and answers no Enter key.
+  Making 1,440 cells focusable buttons would cost more DOM than the grid can
+  afford, so the fix is a roving-tabindex grid, which is its own piece of
+  work. The sheets themselves are ordinary buttons and are fully operable.
+- **The sheets are `role="dialog"` without the behaviour that usually
+  implies.** No focus trap, no focus restore, no Escape key — a click on the
+  ✕, on another cell, or on a choice is what closes them. The role is right
+  for what they are; the interaction is not yet complete.
 
 ## Rulings made, so they are not relitigated
 
@@ -76,7 +101,16 @@ test code needs to change.
 - One test writes a real `leavewar:grid` key into jsdom's storage and does not
   clean it up. Harmless while every other test passes an explicit backend and
   none calls bare `initStore()` — it becomes a cross-test dependency the day one
-  does.
-- The DOM ceiling in the geometry gate is 2500 against a measured 2227. Raising
-  it is meant to be a deliberate edit in whichever change adds the nodes, not a
-  reflex when it goes red.
+  does. Now slightly larger a trap than it was, since a bare `initStore()`
+  would read `leavewar:states` and `leavewar:stage` from the same store.
+- The DOM ceiling in the geometry gate is 2500 against a measured 2330.
+  Raising it is meant to be a deliberate edit in whichever change adds the
+  nodes, not a reflex when it goes red. Note the selector's blind spot: it
+  counts `.mx *`, and the bid sheet renders outside the table, so it adds
+  nothing to that figure. The same test therefore also counts the whole
+  document with the sheet open (2384, ceiling 2600).
+- `setCell` stores an empty row object for a person whose last state is
+  cleared, so `states.ramp` can be `{}` rather than absent. Every reader uses
+  `stateOf`, which is indifferent, and `initStore` prunes empty rows on the
+  next load. Worth knowing before someone reads a persisted blob and
+  concludes a row means something.
