@@ -1,5 +1,26 @@
 # LEAVE WAR — Bidding, the Cycle Stages and Approval
 
+> ## ⚠ STALE IN FIVE PLACES — read before executing
+>
+> This plan was written **before** the leave-code rework landed (9 Aug 26).
+> `AM`, `PM`, `HO` and `HL` no longer exist as codes, and `CODES` is no longer
+> exported. A cell is now a **leave type plus a portion**, written in the owner's
+> notation: `OIL` whole day, `*OIL` morning, `OIL*` afternoon.
+>
+> Every line below is verified against the current engine. Fix each as you reach
+> it, or the task fails for the wrong reason and you will waste a round chasing it.
+>
+> | Where | What is stale | Use instead |
+> |---|---|---|
+> | Task 1, `bids.test.ts` (line ~63) | `isBiddable('AM' \| 'PM' \| 'HO')` | `'*LL'`, `'LL*'`, `'*OIL'` |
+> | Task 1, `bids.test.ts` (line ~69) | `'HL'` in the non-bid list | drop it — never a code, only part of what `M` covers |
+> | Task 2, availability tests (lines ~208–209) | `availabilityOf(…, 'AM', …)` | `'*LL'`. The assertion stands: a half day removes exactly 0.5 |
+> | Task 7, interfaces (line ~761) | consumes `CODES` | `LEAVE_TYPES` |
+> | Task 7, `BidPicker.tsx` (lines ~830, ~837) | `Object.values(CODES).filter(…)` | offer **a leave type and a portion** separately — eight types, then whole day / morning / afternoon — and build the string with `formatCell` |
+>
+> The picker change is the substantive one: it is no longer a flat list of codes to
+> click, it is two choices. Everything else is a rename.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use subagent-driven-development (recommended) or executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Let the squadron bid for leave against the live manning picture, and let management approve or refuse each bid, with the period moving through its stages.
