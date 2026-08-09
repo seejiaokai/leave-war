@@ -31,15 +31,37 @@ export function nextStage(stage: Stage): Stage | null {
   return i < 0 || i === STAGE_ORDER.length - 1 ? null : STAGE_ORDER[i + 1]
 }
 
-/** Bids are placed only while the period is open. */
-export function canBid(stage: Stage): boolean {
-  return stage === 'open'
+/**
+ * Two roles, per the spec's §Roles. The scheduler and management both hold
+ * the admin account — the further split between them is a distinction the
+ * owner draws in conversation, and it needs real accounts before it can mean
+ * anything here.
+ *
+ * There is no login, so nothing verifies which of these a person actually
+ * is. This is the affordance model, not a permission model — see
+ * `docs/known-gaps.md`.
+ */
+export type Role = 'member' | 'admin'
+
+/**
+ * Whether this role may write cells at this stage.
+ *
+ * A member edits only while the war is open, so **closing it is what makes
+ * the sheet view-only for the squadron** — there is no second lock that
+ * could be left unapplied. An admin edits throughout, because the reason for
+ * closing is to stop the picture moving underneath the people deciding on
+ * it, not to stop those people correcting it.
+ */
+export function canEdit(stage: Stage, role: Role): boolean {
+  return role === 'admin' || stage === 'open'
 }
 
 /** Decisions are made once bidding has closed and the picture has frozen —
- *  not while bids are still arriving underneath them. */
-export function canDecide(stage: Stage): boolean {
-  return stage === 'closed'
+ *  not while bids are still arriving underneath them — and only by an
+ *  admin. A member watching the same screen sees the outcome, not the
+ *  buttons. */
+export function canDecide(stage: Stage, role: Role): boolean {
+  return role === 'admin' && stage === 'closed'
 }
 
 export function stageLabel(stage: Stage): string {

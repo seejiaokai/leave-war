@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import {
-  canBid,
   canDecide,
+  canEdit,
   categoryOf,
   evaluatePeriod,
   inSquadron,
@@ -9,10 +9,12 @@ import {
   isDuty,
   isWeekend,
   parseCell,
+  raptorOwns,
+  shiftedFrom,
   stateOf,
 } from '../engine'
 import { getState } from '../state/store'
-import { BidPicker, DecisionSheet } from './BidPicker'
+import { BidPicker, DecisionSheet, RaptorSheet } from './BidPicker'
 import { CountRows } from './CountRows'
 import { useVersion } from './useStore'
 import './matrix.css'
@@ -29,24 +31,33 @@ function monthLabel(date: string): string | null {
 
 export function Matrix() {
   useVersion()
-  const { people, period, grid, states, requirements } = getState()
+  const { people, period, grid, states, requirements, role } = getState()
   const dates = period.days.map(d => d.date)
   const verdicts = evaluatePeriod(people, grid, states, requirements, dates)
 
   // Which cell is open, not which sheet is open: what the sheet OFFERS is
-  // derived from the stage, so a period that moves on while a sheet is open
-  // cannot leave the wrong controls on screen.
+  // derived from the stage and the role, so a period that moves on — or a
+  // role that changes — while a sheet is open cannot leave the wrong
+  // controls on screen.
   const [open, setOpen] = useState<{ id: string; callsign: string; date: string } | null>(null)
   const close = () => setOpen(null)
-  const bidding = canBid(period.stage)
-  const deciding = canDecide(period.stage)
+  const editing = canEdit(period.stage, role)
+  const deciding = canDecide(period.stage, role)
 
-  // Which sheet a click opens follows from the stage and from what the cell
-  // already holds. Deciding needs an existing bid to decide: a course, a
-  // sick day and an empty cell are all things nobody asked for, so there is
-  // nothing there to approve or refuse.
+  // Which sheet a click opens follows from three things: the stage, the role,
+  // and what the cell already holds.
+  //
+  // A cell Raptor owns always opens, at every stage and for either role, but
+  // only ever onto the read-only sheet — a member who cannot edit anything
+  // still deserves to be told why that particular cell is green and why
+  // nothing here will change it.
+  //
+  // Deciding needs an existing bid to decide: a course, a sick day and an
+  // empty cell are all things nobody asked for.
   const openable = (personId: string, date: string): boolean =>
-    bidding || (deciding && isBiddable(grid[personId]?.[date]))
+    raptorOwns(states, personId, date) ||
+    editing ||
+    (deciding && isBiddable(grid[personId]?.[date]))
 
   return (
     <div className="stage">
@@ -132,6 +143,16 @@ export function Matrix() {
                     // two can never disagree.
                     const portion = here && code ? parseCell(code)?.portion : undefined
                     const portionClass = portion === 'am' || portion === 'pm' ? ` ${portion}` : ''
+                    // Two marks on top of the state colour, never instead of
+                    // it: the squadron reads green as approved and magenta as
+                    // pending, and that stays true here. `raptor` says the
+                    // approval happened elsewhere and nothing on this screen
+                    // will change it; `moved` says management shifted this
+                    // bid off another date.
+                    const marks = [
+                      here && code && raptorOwns(states, p.id, d.date) ? 'raptor' : '',
+                      here && code && shiftedFrom(states, p.id, d.date) ? 'moved' : '',
+                    ].filter(Boolean).join(' ')
                     // A cell outside the person's time in the squadron is
                     // never actionable: bidding leave for a man who has been
                     // posted out is a data-entry accident, not a bid.
@@ -145,7 +166,13 @@ export function Matrix() {
                           ? () => setOpen({ id: p.id, callsign: p.callsign, date: d.date })
                           : undefined}
                       >
-                        {text && <span className={`c${chipState ? ` ${chipState}` : ''}${portionClass}`}>{text}</span>}
+                        {text && (
+                          <span
+                            className={`c${chipState ? ` ${chipState}` : ''}${portionClass}${marks ? ` ${marks}` : ''}`}
+                          >
+                            {text}
+                          </span>
+                        )}
                       </td>
                     )
                   })}
@@ -160,7 +187,25 @@ export function Matrix() {
           sheet inside it would be clipped by its own scroller. Keyed by the
           cell so opening a second one remounts rather than carrying the
           first's portion choice across. */}
-      {open && bidding && (
+      {/* Raptor's ownership is checked FIRST and short-circuits both other
+          sheets. That cell is approved elsewhere: offering a picker or a
+          decision on it would offer an action the store will refuse, which
+          is worse than offering nothing. */}
+      {open && raptorOwns(states, open.id, open.date) && (
+        <RaptorSheet
+          callsign={open.callsign}
+          date={open.date}
+          code={grid[open.id]?.[open.date] ?? ''}
+          onClose={close}
+        />
+      )}
+      {/* An admin at `closed` can BOTH edit and decide, so the two are not
+          mutually exclusive and the order between them matters. Deciding
+          wins on a cell that holds a bid, because that is what the stage is
+          for; the picker still opens on an empty one, so an admin can add
+          leave to a closed sheet without a second control. */}
+      {open && !raptorOwns(states, open.id, open.date) && editing
+        && !(deciding && isBiddable(grid[open.id]?.[open.date])) && (
         <BidPicker
           key={`${open.id}-${open.date}`}
           callsign={open.callsign}
@@ -170,13 +215,17 @@ export function Matrix() {
           onClose={close}
         />
       )}
-      {open && deciding && isBiddable(grid[open.id]?.[open.date]) && (
+      {open && !raptorOwns(states, open.id, open.date) && deciding
+        && isBiddable(grid[open.id]?.[open.date]) && (
         <DecisionSheet
+          key={`${open.id}-${open.date}`}
           callsign={open.callsign}
           personId={open.id}
           date={open.date}
           code={grid[open.id][open.date]}
           state={stateOf(states, open.id, open.date)}
+          movedFrom={shiftedFrom(states, open.id, open.date)}
+          dates={dates}
           onClose={close}
         />
       )}

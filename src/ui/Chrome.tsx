@@ -4,7 +4,7 @@
 // the engine does not model. See CLAUDE-facing restyle brief for why.
 
 import { evaluatePeriod, nextStage, stageLabel } from '../engine'
-import { advanceStage, getState } from '../state/store'
+import { advanceStage, getState, setRole } from '../state/store'
 import { useVersion } from './useStore'
 import './chrome.css'
 
@@ -35,7 +35,7 @@ export function Topbar() {
 
 export function StageBar() {
   useVersion()
-  const { people, period, grid, states, requirements } = getState()
+  const { people, period, grid, states, requirements, role } = getState()
   const dates = period.days.map(d => d.date)
   // Duplicates the same evaluatePeriod call Matrix makes internally. Both
   // stay self-contained (no prop plumbing between them) so Matrix keeps
@@ -72,6 +72,22 @@ export function StageBar() {
         onClick={advanceStage}
       >
         → {next ? stageLabel(next) : 'END OF CYCLE'}
+      </button>
+      {/* Nothing verifies this. There is no login, so switching it changes
+          which controls appear and nothing else — the store is plain about
+          that too. Labelled "viewing as" rather than "role" so it does not
+          read as an identity the app has checked. */}
+      <span className="lab" style={{ marginLeft: 12 }}>Viewing as</span>
+      <button
+        className={`rchip${role === 'admin' ? ' admin' : ''}`}
+        data-testid="role-toggle"
+        aria-pressed={role === 'admin'}
+        title={role === 'admin'
+          ? 'Admin: edits at every stage and decides once bidding closes. Not verified — there is no login.'
+          : 'Member: edits only while the war is open.'}
+        onClick={() => setRole(role === 'admin' ? 'member' : 'admin')}
+      >
+        {role === 'admin' ? 'ADMIN' : 'MEMBER'}
       </button>
       <span className="lab" style={{ marginLeft: 12 }}>Under-manned</span>
       <span className={`fchip${redDays > 0 ? ' undermanned' : ''}`} data-testid="undermanned">

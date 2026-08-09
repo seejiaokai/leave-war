@@ -15,7 +15,7 @@
 
 import { useState } from 'react'
 import { formatCell, LEAVE_TYPES, type BidState, type Portion } from '../engine'
-import { setBidState, setCell } from '../state/store'
+import { setBidState, setCell, shiftBid } from '../state/store'
 import './bidpicker.css'
 
 const PORTIONS: { portion: Portion; label: string; testid: string }[] = [
@@ -115,6 +115,8 @@ export function DecisionSheet({
   date,
   code,
   state,
+  movedFrom,
+  dates,
   onClose,
 }: {
   callsign: string
@@ -122,11 +124,34 @@ export function DecisionSheet({
   date: string
   code: string
   state: BidState | undefined
+  /** Set when this bid has already been moved once; the date it came from. */
+  movedFrom?: string
+  /** Every date in the period, used only for the move field's bounds so a
+   *  bid cannot be moved outside the war it belongs to. */
+  dates: string[]
   onClose: () => void
 }) {
+  const [to, setTo] = useState('')
+  // A refused move has to say WHY, or the button reads as broken. The store
+  // returns the reason; this turns it into the sentence management needs.
+  const [problem, setProblem] = useState('')
+
   const decide = (bid: BidState) => {
     setBidState(personId, date, bid)
     onClose()
+  }
+
+  const move = () => {
+    if (!to) return
+    const result = shiftBid(personId, date, to)
+    if (result === 'shifted') return onClose()
+    setProblem(
+      result === 'occupied'
+        ? `${to} already has something booked — clear it first.`
+        : result === 'raptor'
+          ? 'Raptor owns this cell; move it there instead.'
+          : 'There is no bid here to move.',
+    )
   }
 
   return (
@@ -134,7 +159,9 @@ export function DecisionSheet({
       <div className="bidsheet-hd">
         <span className="who">{callsign}</span>
         <span className="dt">{date}</span>
-        <span className="cur">{code}{state ? ` · ${state}` : ''}</span>
+        <span className="cur">
+          {code}{state ? ` · ${state}` : ''}{movedFrom ? ` · moved from ${movedFrom}` : ''}
+        </span>
         <button className="x" data-testid="bid-cancel" onClick={onClose} aria-label="Cancel">
           ✕
         </button>
@@ -160,6 +187,69 @@ export function DecisionSheet({
         >
           Refuse
         </button>
+      </div>
+
+      {/* Moving a bid is what management does instead of refusing when a week
+          goes red and refusing outright is too blunt. It lands PENDING and
+          they approve it afterwards on the new date — a move is a proposal
+          with a trail, not a silent re-approval. */}
+      <div className="bidsheet-row">
+        <span className="lab">Move to</span>
+        <input
+          type="date"
+          className="dateinput"
+          data-testid="shift-date"
+          value={to}
+          min={dates[0]}
+          max={dates[dates.length - 1]}
+          onChange={e => { setTo(e.target.value); setProblem('') }}
+        />
+        <button className="dchip move" data-testid="decide-shift" disabled={!to} onClick={move}>
+          Move
+        </button>
+        {problem && <span className="note warn" data-testid="shift-problem">{problem}</span>}
+      </div>
+    </div>
+  )
+}
+
+/**
+ * A cell Raptor owns: read-only, and it says why.
+ *
+ * The leave was entered in Raptor's input tab, which means the person sought
+ * approval verbally and already has it. There is nothing to decide and
+ * nothing to edit — the store refuses both — so this sheet offers neither.
+ * Offering an action that will be silently ignored is worse than offering
+ * none, which is why it is a separate sheet rather than a disabled version
+ * of the other two.
+ */
+export function RaptorSheet({
+  callsign,
+  date,
+  code,
+  onClose,
+}: {
+  callsign: string
+  date: string
+  code: string
+  onClose: () => void
+}) {
+  return (
+    <div className="bidsheet" data-testid="raptor-sheet" role="dialog" aria-label="Leave from Raptor">
+      <div className="bidsheet-hd">
+        <span className="who">{callsign}</span>
+        <span className="dt">{date}</span>
+        <span className="cur">{code} · approved</span>
+        <button className="x" data-testid="bid-cancel" onClick={onClose} aria-label="Close">
+          ✕
+        </button>
+      </div>
+      <div className="bidsheet-row">
+        <span className="lab">From Raptor</span>
+        <span className="note" data-testid="raptor-note">
+          Entered on Raptor’s input tab, so it was approved there — change it in Raptor and it
+          syncs back here.
+        </span>
       </div>
     </div>
   )

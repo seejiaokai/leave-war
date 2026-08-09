@@ -232,3 +232,23 @@
 .mx tbody tr td.act:hover {
   background: rgba(59, 198, 232, .12);
 }
+
+/* Two marks that sit ON TOP of a state colour, never instead of one. The
+   squadron's colour convention is approved by the owner and unchanged: green
+   is approved, magenta pending, red refused. These answer a second question
+   the colour cannot — where the cell came from, and whether it was moved —
+   for management scanning the grid.
+
+   Both are a 2px left edge rather than a fill or a border, because a chip is
+   26px wide on a phone and anything larger competes with the code it is
+   decorating. If either reads as damage at that size, delete the rule: the
+   state colour is the load-bearing part and it survives without them. */
+.mx td .c.raptor {
+  border-left: 2px solid var(--accent);
+  padding-left: 2px;
+}
+
+.mx td .c.moved {
+  border-left: 2px dotted #F2C879;
+  padding-left: 2px;
+}

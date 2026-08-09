@@ -201,3 +201,25 @@
   opacity: .4;
   cursor: default;
 }
+
+/* The role switch. Tinted only as admin, because member is the ordinary
+   state and the squadron should not see a permanently lit control implying
+   they hold something they do not. */
+.rchip {
+  background: var(--panel-2);
+  border: 1px solid var(--edge);
+  color: var(--ink-2);
+  padding: 6px 11px;
+  border-radius: 9px;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.rchip.admin {
+  background: rgba(178, 77, 234, .14);
+  border-color: rgba(178, 77, 234, .55);
+  color: #D9A6F5;
+}

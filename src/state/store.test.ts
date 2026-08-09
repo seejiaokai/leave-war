@@ -1,5 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { advanceStage, getState, getVersion, initStore, setBidState, setCell, subscribe } from './store'
+import {
+  advanceStage,
+  getState,
+  getVersion,
+  ingestFromRaptor,
+  initStore,
+  setBidState,
+  setCell,
+  setRole,
+  shiftBid,
+  subscribe,
+} from './store'
 import { localBackend, memoryBackend } from './storage'
 
 beforeEach(() => {
@@ -410,5 +421,200 @@ describe('the stored bid record', () => {
     initStore(backend)
     setCell('jaguar', '2026-01-20', 'OL')
     expect(getState().states.jaguar['2026-01-20']).toEqual({ state: 'pending', source: 'bid' })
+  })
+})
+
+describe('the role', () => {
+  it('opens as a member, not with the locks already off', () => {
+    expect(getState().role).toBe('member')
+  })
+
+  it('switches, persists and reloads', () => {
+    const backend = memoryBackend()
+    initStore(backend)
+    setRole('admin')
+    expect(getState().role).toBe('admin')
+    initStore(backend)
+    expect(getState().role).toBe('admin')
+  })
+
+  it('falls back to member when the stored role is not one', () => {
+    const backend = memoryBackend()
+    backend.write('role', 'superuser')
+    initStore(backend)
+    expect(getState().role).toBe('member')
+  })
+
+  it('does not notify when set to the role it already is', () => {
+    setRole('admin')
+    const before = getVersion()
+    setRole('admin')
+    expect(getVersion()).toBe(before)
+  })
+})
+
+describe('leave that came in through Raptor', () => {
+  // Entering leave in Raptor's input tab means the person asked verbally and
+  // was told yes. The approval has already happened; Leave War is being told
+  // about it, not being asked to decide it.
+  it('lands already approved, and marked as Raptor\'s', () => {
+    expect(ingestFromRaptor('dusk', '2026-02-11', 'LL')).toBe('written')
+    expect(getState().grid.dusk['2026-02-11']).toBe('LL')
+    expect(getState().states.dusk['2026-02-11']).toEqual({ state: 'approved', source: 'raptor' })
+  })
+
+  it('takes a half day in the squadron\'s own notation', () => {
+    expect(ingestFromRaptor('dusk', '2026-02-11', '*LL')).toBe('written')
+    expect(getState().grid.dusk['2026-02-11']).toBe('*LL')
+  })
+
+  // The spec's rule, unchanged: the system never overwrites a bid. It raises
+  // the clash and a human decides.
+  it('never overwrites a different bid — it reports a clash instead', () => {
+    setCell('dusk', '2026-02-11', 'LL')
+    expect(ingestFromRaptor('dusk', '2026-02-11', 'OL')).toBe('clash')
+    expect(getState().grid.dusk['2026-02-11']).toBe('LL')
+    expect(getState().states.dusk['2026-02-11']).toEqual({ state: 'pending', source: 'bid' })
+  })
+
+  // The same code is not a clash. That is Raptor confirming what was already
+  // asked for, so the cell is upgraded in place rather than left pending
+  // forever waiting on a decision that has already been made.
+  it('confirms a matching bid in place, approving it', () => {
+    setCell('dusk', '2026-02-11', 'LL')
+    expect(ingestFromRaptor('dusk', '2026-02-11', 'LL')).toBe('confirmed')
+    expect(getState().states.dusk['2026-02-11']).toEqual({ state: 'approved', source: 'raptor' })
+  })
+
+  it('ignores a code nobody bids for, and an empty one', () => {
+    expect(ingestFromRaptor('dusk', '2026-02-11', 'CSE')).toBe('ignored')
+    expect(ingestFromRaptor('dusk', '2026-02-11', '')).toBe('ignored')
+    expect(ingestFromRaptor('dusk', '2026-02-11', 'ZZZ')).toBe('ignored')
+    expect(getState().grid.dusk?.['2026-02-11']).toBeUndefined()
+  })
+
+  it('re-ingesting a cell Raptor already owns just updates it', () => {
+    ingestFromRaptor('dusk', '2026-02-11', 'LL')
+    expect(ingestFromRaptor('dusk', '2026-02-11', 'OL')).toBe('written')
+    expect(getState().grid.dusk['2026-02-11']).toBe('OL')
+    expect(getState().states.dusk['2026-02-11']).toEqual({ state: 'approved', source: 'raptor' })
+  })
+})
+
+describe('a cell Raptor owns', () => {
+  beforeEach(() => {
+    ingestFromRaptor('dusk', '2026-02-11', 'LL')
+  })
+
+  // Raptor owns what Raptor last wrote. It is changed in Raptor's input tab
+  // and syncs back here; changing it here would leave the two systems
+  // disagreeing, which is the single failure this model exists to prevent.
+  it('cannot be edited from Leave War', () => {
+    setCell('dusk', '2026-02-11', 'OL')
+    expect(getState().grid.dusk['2026-02-11']).toBe('LL')
+    expect(getState().states.dusk['2026-02-11'].source).toBe('raptor')
+  })
+
+  it('cannot be cleared from Leave War', () => {
+    setCell('dusk', '2026-02-11', '')
+    expect(getState().grid.dusk['2026-02-11']).toBe('LL')
+  })
+
+  // There is nothing here to decide: the approval already happened, verbally,
+  // before Leave War ever saw the cell.
+  it('cannot be approved or refused from Leave War', () => {
+    setBidState('dusk', '2026-02-11', 'refused')
+    expect(getState().states.dusk['2026-02-11'].state).toBe('approved')
+  })
+
+  it('does not notify when a refused write is ignored', () => {
+    const before = getVersion()
+    setCell('dusk', '2026-02-11', 'OL')
+    setBidState('dusk', '2026-02-11', 'refused')
+    expect(getVersion()).toBe(before)
+  })
+})
+
+describe('shifting a bid', () => {
+  // Management moves leave to a different date instead of refusing it — what
+  // they actually do when a week goes red and refusing outright is too blunt.
+  it('moves the code to the new date and empties the old one', () => {
+    setCell('dusk', '2026-02-11', 'LL')
+    expect(shiftBid('dusk', '2026-02-11', '2026-02-18')).toBe('shifted')
+    expect(getState().grid.dusk?.['2026-02-11']).toBeUndefined()
+    expect(getState().grid.dusk['2026-02-18']).toBe('LL')
+  })
+
+  // A shift is a PROPOSAL with a paper trail, not a silent re-approval.
+  // Management still has to approve the date they moved it to.
+  it('lands pending, recording the date it came from', () => {
+    setCell('dusk', '2026-02-11', 'LL')
+    setBidState('dusk', '2026-02-11', 'approved')
+    shiftBid('dusk', '2026-02-11', '2026-02-18')
+    expect(getState().states.dusk['2026-02-18']).toEqual({
+      state: 'pending', source: 'bid', shiftedFrom: '2026-02-11',
+    })
+    expect(getState().states.dusk?.['2026-02-11']).toBeUndefined()
+  })
+
+  it('keeps the portion — a shifted morning is still a morning', () => {
+    setCell('dusk', '2026-02-11', '*LL')
+    shiftBid('dusk', '2026-02-11', '2026-02-18')
+    expect(getState().grid.dusk['2026-02-18']).toBe('*LL')
+  })
+
+  it('approving afterwards keeps the trail', () => {
+    setCell('dusk', '2026-02-11', 'LL')
+    shiftBid('dusk', '2026-02-11', '2026-02-18')
+    setBidState('dusk', '2026-02-18', 'approved')
+    expect(getState().states.dusk['2026-02-18']).toEqual({
+      state: 'approved', source: 'bid', shiftedFrom: '2026-02-11',
+    })
+  })
+
+  // Never overwrite. Moving one man's leave onto a day he already has
+  // something booked would destroy the second booking to save the first.
+  it('refuses a destination that already holds a code', () => {
+    setCell('dusk', '2026-02-11', 'LL')
+    setCell('dusk', '2026-02-18', 'OL')
+    expect(shiftBid('dusk', '2026-02-11', '2026-02-18')).toBe('occupied')
+    expect(getState().grid.dusk['2026-02-11']).toBe('LL')
+    expect(getState().grid.dusk['2026-02-18']).toBe('OL')
+  })
+
+  it('refuses to move a cell Raptor owns', () => {
+    ingestFromRaptor('dusk', '2026-02-11', 'LL')
+    expect(shiftBid('dusk', '2026-02-11', '2026-02-18')).toBe('raptor')
+    expect(getState().grid.dusk['2026-02-11']).toBe('LL')
+    expect(getState().grid.dusk?.['2026-02-18']).toBeUndefined()
+  })
+
+  it('refuses to move a cell that holds no bid', () => {
+    expect(shiftBid('dusk', '2026-02-11', '2026-02-18')).toBe('nothing')
+    setCell('dusk', '2026-02-11', 'CSE')
+    expect(shiftBid('dusk', '2026-02-11', '2026-02-18')).toBe('nothing')
+  })
+
+  it('refuses to move a bid onto the date it is already on', () => {
+    setCell('dusk', '2026-02-11', 'LL')
+    expect(shiftBid('dusk', '2026-02-11', '2026-02-11')).toBe('occupied')
+    expect(getState().grid.dusk['2026-02-11']).toBe('LL')
+  })
+
+  it('does not notify when a shift is refused', () => {
+    setCell('dusk', '2026-02-11', 'LL')
+    setCell('dusk', '2026-02-18', 'OL')
+    const before = getVersion()
+    shiftBid('dusk', '2026-02-11', '2026-02-18')
+    expect(getVersion()).toBe(before)
+  })
+
+  it('persists across a reload', () => {
+    const backend = memoryBackend()
+    initStore(backend)
+    setCell('dusk', '2026-02-11', 'LL')
+    shiftBid('dusk', '2026-02-11', '2026-02-18')
+    initStore(backend)
+    expect(getState().states.dusk['2026-02-18'].shiftedFrom).toBe('2026-02-11')
   })
 })

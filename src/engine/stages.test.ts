@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Stage } from './period'
-import { canBid, canDecide, nextStage, stageLabel, STAGE_ORDER } from './stages'
+import { canDecide, canEdit, nextStage, stageLabel, STAGE_ORDER } from './stages'
 
 describe('stage transitions', () => {
   it('runs draft to open to closed to published', () => {
@@ -27,18 +27,30 @@ describe('stage transitions', () => {
 })
 
 describe('what each stage allows', () => {
-  it('accepts bids only while open', () => {
-    expect(canBid('draft')).toBe(false)
-    expect(canBid('open')).toBe(true)
-    expect(canBid('closed')).toBe(false)
-    expect(canBid('published')).toBe(false)
+  // The squadron edits only while the war is open. Closing it is therefore
+  // what makes the sheet view-only for members — there is no separate lock to
+  // forget to apply.
+  it('lets a member edit only while open', () => {
+    expect(canEdit('draft', 'member')).toBe(false)
+    expect(canEdit('open', 'member')).toBe(true)
+    expect(canEdit('closed', 'member')).toBe(false)
+    expect(canEdit('published', 'member')).toBe(false)
   })
 
-  it('accepts decisions only once closed', () => {
-    expect(canDecide('draft')).toBe(false)
-    expect(canDecide('open')).toBe(false)
-    expect(canDecide('closed')).toBe(true)
-    expect(canDecide('published')).toBe(false)
+  // An admin — scheduler and management alike hold that account — keeps
+  // editing after the squadron has been locked out. That is the point of
+  // closing: the picture stops moving underneath the people deciding on it,
+  // while the people deciding can still correct it.
+  it('lets an admin edit at every stage', () => {
+    for (const s of STAGE_ORDER) expect(canEdit(s, 'admin')).toBe(true)
+  })
+
+  it('accepts decisions only once closed, and only from an admin', () => {
+    expect(canDecide('closed', 'admin')).toBe(true)
+    expect(canDecide('draft', 'admin')).toBe(false)
+    expect(canDecide('open', 'admin')).toBe(false)
+    expect(canDecide('published', 'admin')).toBe(false)
+    for (const s of STAGE_ORDER) expect(canDecide(s, 'member')).toBe(false)
   })
 
   it('has a label for every stage', () => {
@@ -48,7 +60,15 @@ describe('what each stage allows', () => {
   // Bidding and deciding are deliberately disjoint: the owner's reason for a
   // cycle with stages is that a bid cannot arrive underneath a decision
   // already made. No stage may permit both.
-  it('never allows bidding and deciding in the same stage', () => {
-    for (const s of STAGE_ORDER) expect(canBid(s) && canDecide(s)).toBe(false)
+  it('never lets a member bid and an admin decide in the same stage', () => {
+    for (const s of STAGE_ORDER) expect(canEdit(s, 'member') && canDecide(s, 'admin')).toBe(false)
+  })
+
+  // The whole reason roles exist here. Once bidding closes, the two roles
+  // must genuinely differ — a build where they agreed everywhere would have
+  // no lock at all, and every other test above would still pass.
+  it('makes the roles differ exactly where the lock matters', () => {
+    const differs = STAGE_ORDER.filter(s => canEdit(s, 'admin') !== canEdit(s, 'member'))
+    expect(differs).toEqual(['draft', 'closed', 'published'])
   })
 })

@@ -144,3 +144,35 @@
   opacity: .45;
   cursor: default;
 }
+
+/* Moving a bid is the third decision, and it is deliberately the quietest of
+   the three: approve and refuse are the common answers, and a move is what
+   you reach for when neither fits. */
+.bidsheet .dchip.move {
+  background: var(--panel-2);
+  color: var(--ink-2);
+  border: 1px solid var(--edge);
+}
+
+.bidsheet .dateinput {
+  background: var(--panel-2);
+  border: 1px solid var(--edge);
+  color: var(--ink-2);
+  border-radius: 9px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-family: inherit;
+  color-scheme: dark;
+}
+
+.bidsheet .note {
+  font-size: 11.5px;
+  color: var(--ink-3);
+  line-height: 1.45;
+  flex: 1 1 220px;
+}
+
+.bidsheet .note.warn {
+  color: #F2C879;
+  flex-basis: 100%;
+}

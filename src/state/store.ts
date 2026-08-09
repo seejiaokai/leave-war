@@ -6,6 +6,7 @@
 import {
   isBiddable,
   nextStage,
+  raptorOwns,
   seedGrid,
   seedPeople,
   seedPeriod,
@@ -19,6 +20,7 @@ import {
   type Period,
   type Person,
   type Requirements,
+  type Role,
   type Stage,
   type States,
 } from '../engine'
@@ -30,6 +32,10 @@ interface State {
   requirements: Requirements
   grid: Grid
   states: States
+  /** Who the person at the keyboard says they are. Nothing verifies it —
+   *  there is no login — so this decides which controls appear, not who is
+   *  allowed to use them. See `docs/known-gaps.md`. */
+  role: Role
 }
 
 let backend: StorageBackend = memoryBackend()
@@ -44,6 +50,9 @@ function blank(): State {
     requirements: seedRequirements(),
     grid: seedGrid(),
     states: seedStates(),
+    // The squadron is the common case, so the app opens as one. An admin
+    // says so deliberately rather than arriving with the locks already off.
+    role: 'member',
   }
 }
 
@@ -177,6 +186,9 @@ export function initStore(b?: StorageBackend): void {
     state.period = { ...state.period, stage: storedStage }
   }
 
+  const storedRole = backend.read('role')
+  if (storedRole === 'member' || storedRole === 'admin') state.role = storedRole
+
   version = 0
   listeners.clear()
 }
@@ -205,12 +217,29 @@ function persist(): void {
   backend.write('grid', JSON.stringify(state.grid))
   backend.write('states', JSON.stringify(state.states))
   backend.write('stage', state.period.stage)
+  backend.write('role', state.role)
+}
+
+/** Switch which role the interface is being used as. Unguarded on purpose:
+ *  with no accounts there is nobody to check against, and pretending
+ *  otherwise would be worse than being plain about it. */
+export function setRole(next: Role): void {
+  if (next === state.role) return
+  state = { ...state, role: next }
+  persist()
+  notify()
 }
 
 // A cell and its bid state are written together. Splitting them across two
 // callers is how the two maps drift — a code with no state, or a state whose
 // code has gone. This is the only function allowed to write either.
 export function setCell(personId: string, date: string, code: string): void {
+  // Raptor owns what Raptor last wrote. That cell is changed in Raptor's
+  // input tab and syncs back here, so writing it here would leave the two
+  // systems disagreeing — the single failure the source model exists to
+  // prevent. Ignore rather than write, and do not notify: nothing changed.
+  if (raptorOwns(state.states, personId, date)) return
+
   const clean = code.trim().toUpperCase()
   const previous = state.grid[personId]?.[date]
   const row = { ...(state.grid[personId] ?? {}) }
@@ -244,6 +273,10 @@ export function setBidState(personId: string, date: string, bid: BidState): void
   // it, which is exactly the drift `setCell` exists to prevent. Ignore it
   // rather than write it.
   if (!isBiddable(state.grid[personId]?.[date])) return
+  // There is nothing to decide on a cell Raptor owns: the approval already
+  // happened, verbally, before Leave War ever saw it. Refusing it here would
+  // claim an authority this app does not have.
+  if (raptorOwns(state.states, personId, date)) return
   // Deciding keeps the rest of the record — the source that wrote it, and
   // the date it was shifted from. Management approving a shifted bid is the
   // second half of that move, and losing the provenance at exactly the
@@ -266,4 +299,99 @@ export function advanceStage(): void {
   state = { ...state, period: { ...state.period, stage: next } }
   persist()
   notify()
+}
+
+/** What an inbound Raptor input did here.
+ *
+ *  `clash` is the one a human has to see: Raptor is asking for a date the
+ *  squadron already bid differently on, and the spec's rule is that the
+ *  system never overwrites a bid — it raises it and a person decides. */
+export type IngestResult = 'written' | 'confirmed' | 'clash' | 'ignored'
+
+/**
+ * Take leave entered directly in Raptor's input tab.
+ *
+ * Entering it there means the person sought approval **verbally and already
+ * has it**, so this lands approved without anyone deciding anything here.
+ * That state is written by this function alone and never trusted from a
+ * caller — there is no path that produces a raptor record in any other
+ * state, which is what makes `raptorOwns` safe to read as "approved
+ * elsewhere".
+ */
+export function ingestFromRaptor(personId: string, date: string, code: string): IngestResult {
+  const clean = code.trim().toUpperCase()
+  // Raptor sends more than leave. Anything nobody bids for is not this
+  // app's business and is dropped rather than written as a cell with a
+  // state that would make no sense.
+  if (!isBiddable(clean)) return 'ignored'
+
+  const existing = state.grid[personId]?.[date]
+  const owned = raptorOwns(state.states, personId, date)
+
+  // A DIFFERENT code already bid here is the clash. Write nothing.
+  if (existing && existing !== clean && !owned) return 'clash'
+
+  // The SAME code is not a clash — it is Raptor confirming what was already
+  // asked for, so the cell is upgraded in place rather than left pending
+  // forever, waiting on a decision that has in fact already been made.
+  const confirming = existing === clean && !owned
+
+  const row = { ...(state.grid[personId] ?? {}), [date]: clean }
+  const srow = {
+    ...(state.states[personId] ?? {}),
+    [date]: { state: 'approved', source: 'raptor' } as BidRecord,
+  }
+  state = {
+    ...state,
+    grid: { ...state.grid, [personId]: row },
+    states: { ...state.states, [personId]: srow },
+  }
+  persist()
+  notify()
+  return confirming ? 'confirmed' : 'written'
+}
+
+/** What a shift did, or why it did nothing. */
+export type ShiftResult = 'shifted' | 'occupied' | 'raptor' | 'nothing'
+
+/**
+ * Move a bid to a different date.
+ *
+ * This is what management does instead of refusing when a week goes red and
+ * refusing outright is too blunt. It lands **pending**, not approved: moving
+ * a bid is a proposal, and someone still has to approve the date it was
+ * moved to. The date it came from is kept on the record, because a leave
+ * date that changed with no trace is exactly the untraceable edit the OIL
+ * ledger exists to end.
+ *
+ * Written here rather than as two `setCell` calls so the whole move is one
+ * write, one persist and one notify — a half-applied shift would leave the
+ * man booked twice or not at all.
+ */
+export function shiftBid(personId: string, from: string, to: string): ShiftResult {
+  const code = state.grid[personId]?.[from]
+  if (!isBiddable(code)) return 'nothing'
+  if (raptorOwns(state.states, personId, from)) return 'raptor'
+  // Never overwrite. Moving one man's leave onto a day he already has
+  // something booked would destroy the second booking to save the first.
+  // Shifting onto its own date lands here too, which is right: it is not a
+  // move, and treating it as one would rewrite the record for nothing.
+  if (state.grid[personId]?.[to]) return 'occupied'
+
+  const row = { ...(state.grid[personId] ?? {}) }
+  delete row[from]
+  row[to] = code
+
+  const srow = { ...(state.states[personId] ?? {}) }
+  delete srow[from]
+  srow[to] = { state: 'pending', source: 'bid', shiftedFrom: from }
+
+  state = {
+    ...state,
+    grid: { ...state.grid, [personId]: row },
+    states: { ...state.states, [personId]: srow },
+  }
+  persist()
+  notify()
+  return 'shifted'
 }
