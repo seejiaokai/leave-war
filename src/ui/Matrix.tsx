@@ -1,11 +1,14 @@
-import { categoryOf, codeOf, inSquadron } from '../engine'
+import { categoryOf, codeOf, evaluatePeriod, inSquadron } from '../engine'
 import { getState } from '../state/store'
+import { CountRows } from './CountRows'
 import { useVersion } from './useStore'
 import './matrix.css'
 
 export function Matrix() {
   useVersion()
-  const { people, period, grid } = getState()
+  const { people, period, grid, requirements } = getState()
+  const dates = period.days.map(d => d.date)
+  const verdicts = evaluatePeriod(people, grid, requirements, dates)
 
   return (
     <div className="mx-wrap">
@@ -25,6 +28,7 @@ export function Matrix() {
             ))}
           </tr>
         </thead>
+        <CountRows verdicts={verdicts} dates={dates} />
         <tbody>
           {people.map(p => (
             <tr key={p.id} data-testid={`row-${p.id}`}>
