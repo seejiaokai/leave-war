@@ -66,9 +66,19 @@
   opacity: .85;
 }
 
+/* Weekend banding runs the FULL COLUMN, header and body alike, not just the
+   header. Banding only the header gives you a tint you have to hunt for; the
+   point of the band is to let the eye find a Tuesday in a 90-column grid
+   without counting, and that needs the whole column. The step from --panel-2
+   is deliberately larger than it was — the first attempt sat 8 values away
+   and was invisible in a screenshot. */
 .mx thead th.weekend {
-  background: #12161B;
+  background: #0D1014;
   color: var(--ink-3);
+}
+
+.mx td.weekend {
+  background: rgba(6, 8, 11, .55);
 }
 
 /* Declared after .weekend on purpose: both rules share specificity (0,2,0),

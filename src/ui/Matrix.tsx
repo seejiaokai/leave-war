@@ -68,6 +68,12 @@ export function Matrix() {
                     const cls = [
                       here ? '' : 'gone',
                       here && isDuty(code) ? 'duty' : '',
+                      // The band runs the whole column, not just the header —
+                      // finding a Tuesday in 90 columns should not need
+                      // counting. `.gone`'s hatch is declared after the
+                      // weekend rule so a posted-out weekend still reads as
+                      // posted out.
+                      isWeekend(d.date) ? 'weekend' : '',
                     ].filter(Boolean).join(' ')
                     const text = here ? code : notYetArrived ? '' : 'PO'
                     // Only `.sc` (duty) and `.info` (everything else with a

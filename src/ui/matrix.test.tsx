@@ -125,3 +125,14 @@ describe('Matrix', () => {
     expect(head.title).toContain('Range closure')
   })
 })
+
+describe('weekend banding', () => {
+  it('bands the whole column, header and body alike', () => {
+    render(<Matrix />)
+    // 2026-01-03 is a Saturday, 2026-01-06 a Tuesday.
+    expect(screen.getByTestId('head-2026-01-03').className).toContain('weekend')
+    expect(screen.getByTestId('cell-ramp-2026-01-03').className).toContain('weekend')
+    expect(screen.getByTestId('head-2026-01-06').className).not.toContain('weekend')
+    expect(screen.getByTestId('cell-ramp-2026-01-06').className).not.toContain('weekend')
+  })
+})
