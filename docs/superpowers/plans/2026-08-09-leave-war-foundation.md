@@ -1478,7 +1478,11 @@ git commit -m "feat(engine): seed roster, quarter and requirements"
 
 **Interfaces:**
 - Consumes: `Grid`, `Person`, `Period`, `Requirements`, `seedGrid`, `seedPeople`, `seedPeriod`, `seedRequirements` from `../engine`
-- Produces: `StorageBackend`, `memoryBackend()`, `localBackend()`, `setBackend(b)`; `getState()`, `setCell(personId, date, code)`, `subscribe(fn)`, `getVersion()`, `initStore(backend?)`
+- Produces: `StorageBackend`, `memoryBackend()`, `localBackend()`; `getState()`, `setCell(personId, date, code)`, `subscribe(fn)`, `getVersion()`, `initStore(backend?)`
+
+Swapping the backend is `initStore(backend)`'s job — there is deliberately no
+separate setter, because changing the backend without re-reading through it
+would leave the store holding another backend's data.
 
 Storage sits behind one seam so that moving to a shared server later is a single change rather than a rewrite of every write path. Every write goes through `setCell` — bypassing it is always a bug, because a write that skips it never notifies the interface and never persists.
 
