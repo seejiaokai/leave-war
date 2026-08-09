@@ -32,6 +32,10 @@ export function CountRows({ verdicts, dates }: { verdicts: Record<string, DayVer
       {rows.map(({ ruleId, label }) => (
         <tr key={ruleId} data-testid={`count-${ruleId}`}>
           <td className="who">{label}</td>
+          {/* A count row is a rule, not a person, so it has no leave
+              balance. The cell exists to keep the column aligned and stays
+              deliberately empty rather than showing a stray figure. */}
+          <td className="bal" data-testid={`counter-count-${ruleId}`} />
           {dates.map(date => {
             const r = byDate.get(date)?.get(ruleId)
             if (!r) return <td key={date} />

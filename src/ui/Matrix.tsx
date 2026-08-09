@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import {
+  balanceOf,
   canDecide,
   canEdit,
   categoryOf,
@@ -7,6 +8,8 @@ import {
   inSquadron,
   isBiddable,
   isDuty,
+  COUNTERS,
+  counterLabel,
   isWeekend,
   parseCell,
   raptorOwns,
@@ -18,6 +21,11 @@ import { BidPicker, DecisionSheet, RaptorSheet } from './BidPicker'
 import { CountRows } from './CountRows'
 import { useVersion } from './useStore'
 import './matrix.css'
+
+/** Rounds for display only — 4.5 stays 4.5, 4 does not become "4.0". The
+ *  same rule the count rows use; nothing in this engine rounds a real
+ *  figure. */
+const show = (n: number) => String(Math.round(n * 10) / 10)
 
 const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC']
 
@@ -31,7 +39,7 @@ function monthLabel(date: string): string | null {
 
 export function Matrix() {
   useVersion()
-  const { people, period, grid, states, requirements, role } = getState()
+  const { people, period, grid, states, requirements, role, openings, ledger } = getState()
   const dates = period.days.map(d => d.date)
   const verdicts = evaluatePeriod(people, grid, states, requirements, dates)
 
@@ -41,6 +49,13 @@ export function Matrix() {
   // controls on screen.
   const [open, setOpen] = useState<{ id: string; callsign: string; date: string } | null>(null)
   const close = () => setOpen(null)
+  // ONE selected counter, shared by every row. Giving each row its own
+  // scroller would let them desync — row 1 showing ANNUAL while row 2 shows
+  // OIL — which is worse than no panel at all.
+  const [counter, setCounter] = useState(0)
+  const shown = COUNTERS[counter]
+  const cycle = (by: number) => setCounter(c => (c + by + COUNTERS.length) % COUNTERS.length)
+
   const editing = canEdit(period.stage, role)
   const deciding = canDecide(period.stage, role)
 
@@ -70,6 +85,30 @@ export function Matrix() {
             <thead>
               <tr>
                 <th className="who">Callsign</th>
+                {/* The counter selector lives in the column header, which is
+                    the only place a 40px-wide column has room for a control.
+                    Arrows are the guaranteed path on every device; the
+                    column is frozen alongside the callsign so the figure
+                    stays beside the name however far the grid scrolls. */}
+                <th className="bal" data-testid="counter-head">
+                  <button
+                    className="cnav"
+                    data-testid="counter-prev"
+                    aria-label={`Show the previous counter (now ${counterLabel(shown)})`}
+                    onClick={() => cycle(-1)}
+                  >
+                    ‹
+                  </button>
+                  <span className="cname" data-testid="counter-name">{counterLabel(shown)}</span>
+                  <button
+                    className="cnav"
+                    data-testid="counter-next"
+                    aria-label={`Show the next counter (now ${counterLabel(shown)})`}
+                    onClick={() => cycle(1)}
+                  >
+                    ›
+                  </button>
+                </th>
                 {period.days.map(d => {
                   const mon = monthLabel(d.date)
                   return (
@@ -96,6 +135,23 @@ export function Matrix() {
                     {p.callsign}
                     <span className="cat">{categoryOf(p)}</span>
                   </td>
+                  {/* Derived on every render rather than cached: the figure
+                      has to move the instant a bid is placed, because a
+                      pending bid has been asked for and cannot be asked for
+                      twice. Negative shows red and is never refused — the
+                      squadron's balances already run negative (§Counters). */}
+                  {(() => {
+                    const left = balanceOf(openings, ledger, grid, states, p.id, shown)
+                    return (
+                      <td
+                        className={`bal${left < 0 ? ' neg' : ''}`}
+                        data-testid={`bal-${p.id}`}
+                        title={`${p.callsign}: ${show(left)} ${counterLabel(shown)} remaining, pending bids included`}
+                      >
+                        {show(left)}
+                      </td>
+                    )
+                  })()}
                   {period.days.map(d => {
                     const code = grid[p.id]?.[d.date] ?? ''
                     const here = inSquadron(p, d.date)

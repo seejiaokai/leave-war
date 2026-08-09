@@ -123,6 +123,12 @@ test('the matrix stays within a sane DOM size', async ({ page }) => {
   // is why the second half of this test counts the whole document with the
   // sheet open — a sheet that grew without bound would otherwise never
   // trouble the ceiling at all.
+  //
+  // The counter column DOES sit inside `.mx` — one cell per person, one per
+  // count row, plus the header and its two arrows — taking the figure to
+  // 2357, measured 2026-08-09. That is one cell per row and cannot grow
+  // with the number of counters, which is the point of a single cycling
+  // column. Ceiling stays at 2500: still headroom, not a target.
   const nodes = await page.evaluate(() => document.querySelectorAll('.mx *').length)
   // A missing `.mx` would make this 0, which is comfortably "less than the
   // ceiling" — assert it's also nonzero so an absent grid fails loudly
@@ -132,8 +138,8 @@ test('the matrix stays within a sane DOM size', async ({ page }) => {
 
   await page.locator('[data-testid="cell-dusk-2026-02-11"]').click()
   await expect(page.locator('[data-testid="bid-picker"]')).toBeVisible()
-  // 2384 whole-document nodes with the sheet open, measured 2026-08-09
-  // (2330 of them the matrix). Ceiling 2600 on the same headroom principle.
+  // 2413 whole-document nodes with the sheet open, measured 2026-08-09
+  // (2357 of them the matrix). Ceiling 2600 on the same headroom principle.
   const all = await page.evaluate(() => document.querySelectorAll('*').length)
   expect(all).toBeGreaterThan(nodes)
   expect(all).toBeLessThan(2600)
@@ -257,4 +263,120 @@ test('an admin moves a bid to another date, and it lands pending there', async (
   await expect(moved).toBeVisible()
   expect(await moved.getAttribute('class')).toContain('tbc')
   expect(await moved.getAttribute('class')).toContain('moved')
+})
+
+// ---- the frozen counter column ----
+//
+// This is the riskiest surface in the build and the one jsdom is blindest
+// to: a second sticky column anchors its `left:` to the first column's
+// width, so a `.who` free to grow slides the two apart and leaves a gap the
+// day cells scroll through. Every rectangle is 0×0 in the unit suite, so
+// none of that is visible there.
+
+test('both frozen columns stay put when the grid scrolls sideways', async ({ page }) => {
+  const who = page.locator('[data-testid="row-ramp"] .who')
+  const bal = page.locator('[data-testid="bal-ramp"]')
+  const before = { who: (await who.boundingBox())!, bal: (await bal.boundingBox())! }
+
+  const wrap = page.locator('.mx-wrap')
+  await wrap.evaluate(el => el.scrollBy(600, 0))
+  expect(await wrap.evaluate(el => el.scrollLeft)).toBeGreaterThan(0)
+
+  const after = { who: (await who.boundingBox())!, bal: (await bal.boundingBox())! }
+  expect(Math.abs(after.who.x - before.who.x)).toBeLessThan(1)
+  expect(Math.abs(after.bal.x - before.bal.x)).toBeLessThan(1)
+})
+
+test('the two frozen columns sit flush — no gap, no overlap', async ({ page }) => {
+  const who = (await page.locator('[data-testid="row-ramp"] .who').boundingBox())!
+  const bal = (await page.locator('[data-testid="bal-ramp"]').boundingBox())!
+  // The balance column starts exactly where the callsign column ends. A gap
+  // lets day cells scroll through between them; an overlap hides the name.
+  expect(Math.abs(bal.x - (who.x + who.width))).toBeLessThan(1)
+})
+
+test('the balance column is opaque — day cells never show through it', async ({ page }) => {
+  await page.locator('.mx-wrap').evaluate(el => el.scrollBy(600, 0))
+  const bg = await page.locator('[data-testid="bal-ramp"]')
+    .evaluate(el => getComputedStyle(el).backgroundColor)
+  expect(bg).not.toBe('rgba(0, 0, 0, 0)')
+})
+
+// The space arithmetic, checked against a real browser rather than read off
+// the stylesheet. The estimate that justified this design was WRONG — it
+// assumed 30px day columns from `min-width`, where the rendered width is
+// ~41px — so the figures below are measured, on 2026-08-09:
+//
+//   phone (390px viewport): wrap 348, callsign 76, balance 44 → 5.6 days
+//   the same phone before the counter column: callsign 118    → 5.6 days
+//
+// The callsign column gives back almost exactly what the counter column
+// takes, which was the whole point of tightening it. This test guards that
+// trade rather than the individual numbers: a counter panel that left four
+// days on screen would be a worse app than no counters at all.
+test('the counter column does not eat the grid on a phone', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 664 })
+  const m = await page.evaluate(() => {
+    const wrap = document.querySelector('.mx-wrap')!.getBoundingClientRect().width
+    const who = document.querySelector('[data-testid="row-ramp"] .who')!.getBoundingClientRect().width
+    const bal = document.querySelector('[data-testid="bal-ramp"]')!.getBoundingClientRect().width
+    const day = document.querySelector('[data-testid="cell-ramp-2026-01-15"]')!.getBoundingClientRect().width
+    return { wrap, who, bal, day }
+  })
+  expect(m.day).toBeGreaterThan(0)
+  const visibleDays = (m.wrap - m.who - m.bal) / m.day
+  expect(visibleDays).toBeGreaterThan(5)
+  // The frozen pair must stay a minority of a phone screen. Widening the
+  // callsign column back to its desktop 118px would trip this.
+  expect((m.who + m.bal) / m.wrap).toBeLessThan(0.4)
+})
+
+test('the counter column changes every row at once', async ({ page }) => {
+  await expect(page.locator('[data-testid="counter-name"]')).toHaveText('ANNUAL')
+  const rows = ['ramp', 'tata', 'jaguar', 'dusk']
+  const before = await Promise.all(rows.map(r => page.locator(`[data-testid="bal-${r}"]`).textContent()))
+
+  await page.locator('[data-testid="counter-next"]').click()
+  await expect(page.locator('[data-testid="counter-name"]')).toHaveText('OIL')
+
+  const after = await Promise.all(rows.map(r => page.locator(`[data-testid="bal-${r}"]`).textContent()))
+  expect(after).not.toEqual(before)
+  // Every row moved together — none is still showing the previous counter.
+  for (const v of after) expect(v).not.toBeNull()
+})
+
+test('a negative balance is painted red, and a positive one is not', async ({ page }) => {
+  // DECAL's OIL opens at -4.5 and nothing in the seed moves it.
+  await page.locator('[data-testid="counter-next"]').click()
+  await expect(page.locator('[data-testid="counter-name"]')).toHaveText('OIL')
+  const neg = await page.locator('[data-testid="bal-decal"]').evaluate(el => ({
+    text: el.textContent, colour: getComputedStyle(el).color,
+  }))
+  expect(neg.text).toBe('-4.5')
+  const pos = await page.locator('[data-testid="bal-ramp"]')
+    .evaluate(el => getComputedStyle(el).color)
+  expect(neg.colour).not.toBe(pos)
+})
+
+// Nothing in the frozen column may be cut off. `.who` carries `overflow:
+// hidden` — without it a long label would push the balance column out of
+// alignment — so an oversized label fails SILENTLY, appearing merely
+// truncated. jsdom reports every width as 0 and cannot see it at all.
+//
+// This caught two real cases when the phone breakpoint tightened the column
+// to 76px: "Crew sets" wanted 84px against 75 available, and "IP + IWSO" 77.
+// Both are count-row labels; every callsign still fitted, which is why the
+// bug was invisible until it was measured.
+test('nothing in the callsign column is cut off', async ({ page }) => {
+  const clipped = await page.evaluate(() =>
+    [...document.querySelectorAll('.mx .who')]
+      .map(el => el as HTMLElement)
+      .filter(el => el.scrollWidth > el.clientWidth + 1)
+      .map(el => `${el.textContent?.trim()} (${el.scrollWidth} > ${el.clientWidth})`))
+  expect(clipped).toEqual([])
+
+  // Proves the collection was not empty, so an absent `.who` cannot pass
+  // this by having nothing to check.
+  const count = await page.locator('.mx .who').count()
+  expect(count).toBeGreaterThan(10)
 })

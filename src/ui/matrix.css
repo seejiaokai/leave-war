@@ -23,20 +23,98 @@
   height: 22px;
 }
 
-/* The frozen callsign column. `left: 0` plus a solid --panel background is
-   what stops the day cells showing through it while the grid scrolls
-   sideways. */
-.mx .who {
+/* The two frozen columns. `left: 0` plus a solid --panel background is what
+   stops the day cells showing through while the grid scrolls sideways.
+
+   `.who` is a FIXED width, not a min-width, and that is load-bearing: the
+   balance column anchors its own `left:` to this number, and a `.who` free
+   to grow would slide the two apart and leave a gap the day cells show
+   through. Change one and you must change the other. */
+:root {
+  --who-w: 118px;
+  --bal-w: 44px;
+}
+
+.mx .who,
+.mx .bal {
   position: sticky;
-  left: 0;
   z-index: 2;
   background: var(--panel);
+}
+
+.mx .who {
+  left: 0;
   text-align: left;
-  min-width: 118px;
+  width: var(--who-w);
+  min-width: var(--who-w);
+  max-width: var(--who-w);
   padding-left: 12px;
   font-weight: 600;
   color: var(--ink-2);
+  overflow: hidden;
 }
+
+/* The balance column: ONE column showing one counter, not one column per
+   counter. That is the whole idea — its cost is fixed at 44px however many
+   entitlements exist, so a ninth leave type does not shrink the grid. */
+.mx .bal {
+  left: var(--who-w);
+  width: var(--bal-w);
+  min-width: var(--bal-w);
+  max-width: var(--bal-w);
+  text-align: center;
+  font-weight: 700;
+  font-size: 10.5px;
+  color: var(--ink-2);
+  /* A hairline that reads as the edge of the frozen pair, so the eye sees
+     one fixed panel rather than two columns that happen to be stuck. */
+  box-shadow: inset -1px 0 0 var(--edge);
+}
+
+.mx .bal.neg {
+  color: #FFAAB0;
+}
+
+.mx thead th.bal {
+  z-index: 3;
+  background: var(--panel-2);
+  padding: 2px 1px;
+  white-space: nowrap;
+}
+
+.mx thead th.bal .cname {
+  display: block;
+  font-size: 8.5px;
+  letter-spacing: .06em;
+  color: var(--accent);
+}
+
+.mx thead th.bal .cnav {
+  background: none;
+  border: none;
+  color: var(--ink-3);
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+  padding: 0 3px;
+  font-family: inherit;
+}
+
+.mx thead th.bal .cnav:hover {
+  color: var(--accent);
+}
+
+/* The counts' own balance cell is deliberately blank — a rule has no leave —
+   but it still needs the frozen background, or day cells scroll through it. */
+.mx .counts td.bal {
+  background: var(--panel);
+}
+
+/* Phone: the balance column has to be PAID for, not added on top. Below this
+   width the callsign column gives back what the counter column takes, so the
+   number of visible day columns is roughly unchanged — a counter panel that
+   left four days on screen would be a worse app than no counters at all.
+   The category chip drops rather than wrapping: it is secondary information
 
 /* The sticky date header. z-index 3 on the corner cell so it keeps
    winning the stacking order over both the sticky header row and the
@@ -251,4 +329,46 @@
 .mx td .c.moved {
   border-left: 2px dotted #F2C879;
   padding-left: 2px;
+}
+
+/* ---- phone breakpoint ----
+
+   The balance column has to be PAID for, not added on top. Below this width
+   the callsign column gives back what the counter column takes, so the number
+   of visible day columns is roughly unchanged — a counter panel that left
+   four days on screen would be a worse app than no counters at all. The
+   category chip drops rather than wrapping: it is secondary information, and
+   a second line would cost every row's height instead.
+
+   LAST IN THE FILE ON PURPOSE. These overrides share specificity with the
+   rules they narrow (`.mx .counts .who` is 0,3,0 either way), so the later
+   one wins the cascade — and the first attempt put this block near the top,
+   where the `.mx .counts .who` further down silently overrode it and the fix
+   appeared to do nothing at all. Same trap as the .blocked/.weekend ordering
+   above. Do not move this block up the file. */
+@media (max-width: 430px) {
+  :root {
+    --who-w: 76px;
+  }
+
+  .mx .who {
+    padding-left: 6px;
+    font-size: 10px;
+  }
+
+  .mx .cat {
+    display: none;
+  }
+
+  /* The count rows' labels are the longest text in this column — "Crew sets"
+     needed 84px against the 75 available, and "IP + IWSO" 77 — so they were
+     being clipped mid-word while every callsign still fitted. The letter
+     spacing is what costs the room, and it is decoration; the label is not.
+     Found by measuring in a browser, not by reading the stylesheet, and
+     pinned by the geometry gate so the next label to outgrow the column
+     fails loudly instead of appearing cut off on a phone. */
+  .mx .counts .who {
+    letter-spacing: 0;
+    font-size: 9.5px;
+  }
 }
