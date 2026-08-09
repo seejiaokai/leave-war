@@ -1703,7 +1703,23 @@ export function setCell(personId: string, date: string, code: string): void {
 - [ ] **Step 5: Run test to verify it passes**
 
 Run: `npx vitest run src/state/store.test.ts`
-Expected: PASS, 8 tests.
+Expected: PASS, 14 tests.
+
+Six of those go beyond the cases above, and they cover the parts most likely
+to rot unnoticed:
+
+- **`localBackend()` on both paths** — a normal round-trip, and one where
+  `localStorage` access throws (private browsing, storage disabled), asserting
+  read returns null and write does not propagate. Restore the real storage in
+  an `afterEach`, unconditionally: a spy left installed corrupts later tests.
+- **Each degradation branch separately** — `'[]'`, `'null'` and a bare
+  primitive like `'42'` each falling back to the seed. The invalid-JSON case
+  exercises the `catch`; these exercise the shape guard, which is a different
+  branch.
+- **The `initStore` subscriber contract** — subscribe, re-init, write, assert
+  the earlier subscriber is not called. The clearing is deliberate (a fresh
+  boot is a clean slate) but it is a trap for anything that calls `initStore`
+  after mount, so it is pinned as a contract rather than left implicit.
 
 - [ ] **Step 6: Commit**
 
