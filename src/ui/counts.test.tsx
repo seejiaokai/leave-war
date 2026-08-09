@@ -46,7 +46,7 @@ describe('count rows', () => {
   })
 
   it('counts a half day as a half, which the spreadsheet could not', () => {
-    setCell('cross', '2026-02-05', 'AM')
+    setCell('cross', '2026-02-05', '*LL')
     render(<Matrix />)
     expect(screen.getByTestId('count-opsw-2026-02-05').textContent).toBe('4.5')
   })

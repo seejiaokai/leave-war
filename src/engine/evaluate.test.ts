@@ -70,7 +70,7 @@ describe('evaluateDay', () => {
   })
 
   it('judges the set rule fractionally', () => {
-    const grid: Grid = { ow1: { [D]: 'AM' }, ow2: { [D]: 'LL' } } // wsos = 1.5 -> sets 1.5
+    const grid: Grid = { ow1: { [D]: '*LL' }, ow2: { [D]: 'LL' } } // wsos = 1.5 -> sets 1.5
     const sets = evaluateDay(people, grid, reqs, D).results.find(r => r.ruleId === 'sets')!
     expect(sets.have).toBe(1.5)
     expect(sets.verdict).toBe('red')

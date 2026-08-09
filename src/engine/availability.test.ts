@@ -14,8 +14,8 @@ describe('availabilityOf', () => {
   })
 
   it('counts a half day as half a person, which the spreadsheet could not', () => {
-    expect(availabilityOf(someone, '2026-01-05', 'AM')).toBe(0.5)
-    expect(availabilityOf(someone, '2026-01-05', 'HO')).toBe(0.5)
+    expect(availabilityOf(someone, '2026-01-05', '*LL')).toBe(0.5)
+    expect(availabilityOf(someone, '2026-01-05', '*OIL')).toBe(0.5)
   })
 
   it('counts a full day of leave as nobody', () => {
@@ -66,7 +66,7 @@ describe('countsFor', () => {
   })
 
   it('produces a fractional set count from a half day', () => {
-    const grid: Grid = { ow1: { '2026-01-05': 'AM' } }
+    const grid: Grid = { ow1: { '2026-01-05': '*LL' } }
     // pilots 3, wsos 2.5 -> 2.5 sets
     expect(countsFor(people, grid, '2026-01-05').sets).toBe(2.5)
   })
@@ -87,7 +87,7 @@ describe('countsFor', () => {
   it('ensures pilots can be the constraining seat with fractional availability', () => {
     // Take the baseline people (3 pilots, 3 WSOs), remove half of one pilot
     // with a half-day code: 2.5 pilots, 3 WSOs -> 2.5 sets
-    const grid: Grid = { ip1: { '2026-01-05': 'AM' } }
+    const grid: Grid = { ip1: { '2026-01-05': '*LL' } }
     expect(countsFor(people, grid, '2026-01-05').sets).toBe(2.5)
   })
 
@@ -104,7 +104,7 @@ describe('countsFor', () => {
     expect(c.duty).toBe(1)
   })
 
-  it('handles PM half-day code', () => {
-    expect(availabilityOf(p('a', 'pilot', 'ops'), '2026-01-05', 'PM')).toBe(0.5)
+  it('handles a pm-portion cell (the trailing asterisk)', () => {
+    expect(availabilityOf(p('a', 'pilot', 'ops'), '2026-01-05', 'LL*')).toBe(0.5)
   })
 })
