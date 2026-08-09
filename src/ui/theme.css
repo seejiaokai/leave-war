@@ -1,0 +1,48 @@
+/* Design tokens copied verbatim from Raptor's own stylesheet
+   (raptor-port/src/ui/scheduler.css :root), narrowed to the set this app
+   actually uses. LEAVE WAR does not define its own palette — it borrows
+   Raptor's, because this app is merging into Raptor and should already
+   look like it belongs there. */
+:root {
+  --bg: #0B0D10;
+  --panel: #14181D;
+  --panel-2: #1A1F26;
+  --raised: #20262E;
+  --edge: #2A313A;
+  --edge-2: #39424D;
+  --ink: #F1F4F7;
+  --ink-2: #B6C0CB;
+  --ink-3: #8A96A3;
+  --accent: #3BC6E8;
+  --hard: #F0555F;
+  --adv: #E5A83B;
+  --ok: #57C97A;
+  --san: #B24DEA;
+  --sim: #E7C13A;
+  --r: 16px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  color-scheme: dark;
+}
+
+/* Body ground: Raptor's two radial washes over --bg. No webfont is loaded —
+   'Inter Tight' falls through to the system sans, same as Raptor renders
+   before its own webfont arrives, and the offline e2e run never fetches
+   one. */
+body {
+  margin: 0;
+  background:
+    radial-gradient(900px 420px at 12% -8%, rgba(59, 198, 232, .09), transparent 62%),
+    radial-gradient(760px 380px at 98% -6%, rgba(87, 201, 122, .05), transparent 58%),
+    var(--bg);
+  color: var(--ink);
+  font-family: 'Inter Tight', system-ui, sans-serif;
+  font-size: 13px;
+  -webkit-font-smoothing: antialiased;
+  letter-spacing: -.005em;
+}
