@@ -18,7 +18,9 @@ export function Matrix() {
   useVersion()
   const { people, period, grid, requirements } = getState()
   const dates = period.days.map(d => d.date)
-  const verdicts = evaluatePeriod(people, grid, requirements, dates)
+  // `{}` for the bid states until the store carries them — see the bidding
+  // plan, Task 4. Replaced there, not left as a permanent empty map.
+  const verdicts = evaluatePeriod(people, grid, {}, requirements, dates)
 
   return (
     <div className="stage">

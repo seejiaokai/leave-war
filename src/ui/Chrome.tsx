@@ -49,7 +49,9 @@ export function StageBar() {
   // stay self-contained (no prop plumbing between them) so Matrix keeps
   // rendering standalone in its existing tests; the cost is one extra pass
   // over a 90-day period, which is not worth threading props for.
-  const verdicts = evaluatePeriod(people, grid, requirements, dates)
+  // `{}` for the bid states until the store carries them — see the bidding
+  // plan, Task 4. Replaced there, not left as a permanent empty map.
+  const verdicts = evaluatePeriod(people, grid, {}, requirements, dates)
   const redDays = dates.filter(d => verdicts[d].verdict === 'red').length
 
   return (

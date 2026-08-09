@@ -5,6 +5,7 @@
 // "IP >= 2" with two IPs available is fine.
 
 import { countsFor, type DayCounts, type Grid } from './availability'
+import type { States } from './bids'
 import type { Person } from './people'
 import { requirementFor, type ManningRule, type Requirements } from './requirements'
 
@@ -46,10 +47,11 @@ function haveFor(rule: ManningRule, counts: DayCounts): number {
 export function evaluateDay(
   people: Person[],
   grid: Grid,
+  states: States,
   reqs: Requirements,
   date: string,
 ): DayVerdict {
-  const counts = countsFor(people, grid, date)
+  const counts = countsFor(people, grid, states, date)
   const req = requirementFor(reqs, date)
   const results: RuleResult[] = []
 
@@ -83,10 +85,11 @@ export function evaluateDay(
 export function evaluatePeriod(
   people: Person[],
   grid: Grid,
+  states: States,
   reqs: Requirements,
   dates: string[],
 ): Record<string, DayVerdict> {
   const out: Record<string, DayVerdict> = {}
-  for (const date of dates) out[date] = evaluateDay(people, grid, reqs, date)
+  for (const date of dates) out[date] = evaluateDay(people, grid, states, reqs, date)
   return out
 }

@@ -44,7 +44,7 @@ describe('seed', () => {
     const grid = seedGrid()
     const reqs = seedRequirements()
     for (const day of seedPeriod().days) {
-      expect(['ok', 'amber', 'red']).toContain(evaluateDay(people, grid, reqs, day.date).verdict)
+      expect(['ok', 'amber', 'red']).toContain(evaluateDay(people, grid, {}, reqs, day.date).verdict)
     }
   })
 

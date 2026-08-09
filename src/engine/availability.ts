@@ -6,6 +6,7 @@
 // someone on leave. Both are fixed here: availability is fractional, and duty
 // is reported on its own line rather than hidden inside the shortfall.
 
+import { removesAvailability, stateOf, type BidState, type States } from './bids'
 import { codeOf, isDuty } from './codes'
 import { categoryOf, inSquadron, type Category, type Person } from './people'
 
@@ -22,17 +23,27 @@ export interface DayCounts {
   duty: number
 }
 
-export function availabilityOf(p: Person, date: string, code: string | undefined): number {
+export function availabilityOf(
+  p: Person,
+  date: string,
+  code: string | undefined,
+  state?: BidState,
+): number {
   if (!inSquadron(p, date)) return 0
   const c = codeOf(code)
   // An unknown code must not remove anyone. A typo should look wrong on screen,
   // not quietly delete a person from the manning picture.
   if (!c) return 1
   if (c.duty) return 0
+  // A refused bid gives the WHOLE person back, not the fraction the code
+  // would have taken — he is at work all day, not half of one. This sits
+  // after the two guards above on purpose: a refusal returns a man to the
+  // programme, never to a squadron he has left or to a duty he is still on.
+  if (!removesAvailability(code, state)) return 1
   return 1 - c.removes
 }
 
-export function countsFor(people: Person[], grid: Grid, date: string): DayCounts {
+export function countsFor(people: Person[], grid: Grid, states: States, date: string): DayCounts {
   const byCategory = { IP: 0, OPSP: 0, IWSO: 0, OPSW: 0 } as Record<Category, number>
   let sxo = 0
   let duty = 0
@@ -43,7 +54,7 @@ export function countsFor(people: Person[], grid: Grid, date: string): DayCounts
     const code = grid[p.id]?.[date]
     if (inSquadron(p, date) && isDuty(code)) duty += 1
 
-    const have = availabilityOf(p, date, code)
+    const have = availabilityOf(p, date, code, stateOf(states, p.id, date))
     if (have === 0) continue
 
     byCategory[categoryOf(p)] += have
