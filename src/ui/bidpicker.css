@@ -1,0 +1,146 @@
+/* The bid sheet, and the decision sheet that reuses it. Panel tokens only —
+   --panel, --panel-2, --edge, --r — so it reads as the same object as the
+   card the matrix sits in.
+
+   `position: fixed` is the point: the matrix scrolls inside `.mx-wrap`, and
+   anything positioned inside a cell is clipped by that scroller. Anchored to
+   the bottom of the viewport it is also where a thumb already is on a
+   phone. */
+.bidsheet {
+  position: fixed;
+  z-index: 80;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 14px;
+  width: min(560px, calc(100vw - 24px));
+  background: var(--panel);
+  border: 1px solid var(--edge);
+  border-radius: var(--r);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, .55);
+  padding: 10px 12px 12px;
+}
+
+.bidsheet-hd {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding-bottom: 8px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--edge);
+}
+
+.bidsheet-hd .who {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: .1em;
+}
+
+.bidsheet-hd .dt {
+  font-size: 11px;
+  color: var(--ink-3);
+  letter-spacing: .06em;
+}
+
+.bidsheet-hd .cur {
+  font-size: 10px;
+  color: var(--ink-3);
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+/* Pushed to the end of the header rather than given a corner: the sheet is
+   only ever this wide, so `margin-left: auto` is enough and keeps it in the
+   flow for a screen reader. */
+.bidsheet-hd .x {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: var(--ink-3);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 2px 4px;
+  line-height: 1;
+}
+
+.bidsheet-hd .x:hover {
+  color: var(--ink-2);
+}
+
+.bidsheet-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+
+.bidsheet-row .lab {
+  font-size: 10px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  font-weight: 600;
+  min-width: 78px;
+}
+
+.bidsheet .pchip,
+.bidsheet .tchip {
+  background: var(--panel-2);
+  border: 1px solid var(--edge);
+  color: var(--ink-2);
+  padding: 6px 11px;
+  border-radius: 9px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.bidsheet .pchip:hover,
+.bidsheet .tchip:hover {
+  border-color: rgba(59, 198, 232, .5);
+  color: var(--ink);
+}
+
+/* The selected portion uses the accent, not a bid colour: nothing has been
+   asked for yet, so painting it green or purple would promise a state the
+   cell does not have. */
+.bidsheet .pchip.on {
+  background: rgba(59, 198, 232, .14);
+  border-color: rgba(59, 198, 232, .55);
+  color: var(--accent);
+}
+
+.bidsheet .tchip.clear {
+  color: var(--ink-3);
+  border-style: dashed;
+}
+
+/* The two decision buttons borrow the approved/refused chip colours from the
+   matrix so the button and the cell it will paint read as the same thing. */
+.bidsheet .dchip {
+  padding: 7px 16px;
+  border-radius: 9px;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  letter-spacing: .04em;
+}
+
+.bidsheet .dchip.approve {
+  background: rgba(87, 201, 122, .16);
+  color: #8FE0A8;
+  border: 1px solid rgba(87, 201, 122, .5);
+}
+
+.bidsheet .dchip.refuse {
+  background: rgba(240, 85, 95, .16);
+  color: #FFA6AD;
+  border: 1px solid rgba(240, 85, 95, .5);
+}
+
+.bidsheet .dchip[disabled] {
+  opacity: .45;
+  cursor: default;
+}

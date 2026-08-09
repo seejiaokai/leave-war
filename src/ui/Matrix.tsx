@@ -1,4 +1,6 @@
+import { useState } from 'react'
 import {
+  canBid,
   categoryOf,
   evaluatePeriod,
   inSquadron,
@@ -9,6 +11,7 @@ import {
   stateOf,
 } from '../engine'
 import { getState } from '../state/store'
+import { BidPicker } from './BidPicker'
 import { CountRows } from './CountRows'
 import { useVersion } from './useStore'
 import './matrix.css'
@@ -28,6 +31,13 @@ export function Matrix() {
   const { people, period, grid, states, requirements } = getState()
   const dates = period.days.map(d => d.date)
   const verdicts = evaluatePeriod(people, grid, states, requirements, dates)
+
+  // Which cell is open, not which sheet is open: what the sheet OFFERS is
+  // derived from the stage, so a period that moves on while a sheet is open
+  // cannot leave the wrong controls on screen.
+  const [open, setOpen] = useState<{ id: string; callsign: string; date: string } | null>(null)
+  const close = () => setOpen(null)
+  const bidding = canBid(period.stage)
 
   return (
     <div className="stage">
@@ -113,8 +123,19 @@ export function Matrix() {
                     // two can never disagree.
                     const portion = here && code ? parseCell(code)?.portion : undefined
                     const portionClass = portion === 'am' || portion === 'pm' ? ` ${portion}` : ''
+                    // A cell outside the person's time in the squadron is
+                    // never actionable: bidding leave for a man who has been
+                    // posted out is a data-entry accident, not a bid.
+                    const actionable = here && bidding
                     return (
-                      <td key={d.date} data-testid={`cell-${p.id}-${d.date}`} className={cls}>
+                      <td
+                        key={d.date}
+                        data-testid={`cell-${p.id}-${d.date}`}
+                        className={`${cls}${actionable ? ' act' : ''}`}
+                        onClick={actionable
+                          ? () => setOpen({ id: p.id, callsign: p.callsign, date: d.date })
+                          : undefined}
+                      >
                         {text && <span className={`c${chipState ? ` ${chipState}` : ''}${portionClass}`}>{text}</span>}
                       </td>
                     )
@@ -125,6 +146,21 @@ export function Matrix() {
           </table>
         </div>
       </div>
+
+      {/* Rendered outside `.mx-wrap` on purpose: that wrapper scrolls, and a
+          sheet inside it would be clipped by its own scroller. Keyed by the
+          cell so opening a second one remounts rather than carrying the
+          first's portion choice across. */}
+      {open && bidding && (
+        <BidPicker
+          key={`${open.id}-${open.date}`}
+          callsign={open.callsign}
+          personId={open.id}
+          date={open.date}
+          current={grid[open.id]?.[open.date] ?? ''}
+          onClose={close}
+        />
+      )}
     </div>
   )
 }

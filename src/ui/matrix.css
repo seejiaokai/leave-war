@@ -131,10 +131,11 @@
   box-shadow: inset 0 0 0 1px rgba(240, 85, 95, .55);
 }
 
-/* cells — chip idiom: tint + ink + hairline, never a solid block. Only
-   `.sc` (duty codes) and `.info` (everything else) are ever emitted today.
-   `.appr` / `.tbc` / `.ref` exist ready for the bid-state plan — nothing in
-   this app produces those verdicts yet, so nothing wires them up. */
+/* cells — chip idiom: tint + ink + hairline, never a solid block. Five
+   states are emitted: `.sc` for duty, `.info` for the codes nobody bids for,
+   and `.appr` / `.tbc` / `.ref` for an approved, pending and refused bid.
+   The three bid colours sat here unused until the bidding plan lit them up;
+   the values are unchanged from that original definition. */
 .mx td .c {
   display: inline-block;
   min-width: 26px;
@@ -218,4 +219,16 @@
 
 .mx tbody tr:hover td:not(.who) {
   background: rgba(59, 198, 232, .05);
+}
+
+/* An actionable cell — one a click will do something with, which is stage-
+   dependent. The cursor is the only affordance a 30px column has room for;
+   the hover tint sits above the row hover (.12 against .05) so that on a row
+   the pointer is already over, the one cell under it still stands out. */
+.mx td.act {
+  cursor: pointer;
+}
+
+.mx tbody tr td.act:hover {
+  background: rgba(59, 198, 232, .12);
 }
