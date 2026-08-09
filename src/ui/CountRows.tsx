@@ -4,23 +4,43 @@ import type { DayVerdict } from '../engine'
 const show = (n: number) => String(Math.round(n * 10) / 10)
 
 export function CountRows({ verdicts, dates }: { verdicts: Record<string, DayVerdict>; dates: string[] }) {
-  const first = dates.length ? verdicts[dates[0]] : undefined
-  if (!first) return null
+  // `requirementFor` can swap in a wholly different rule set per date via
+  // `overrides[date]` — nothing constrains an override's rules to the same
+  // length or order as the default. So the row set is built by walking
+  // every date's results (not just the first) and keeping the first label
+  // seen per ruleId, and each cell is looked up by ruleId, never by array
+  // position — a reordered or date-only rule must still land in its own
+  // row, not silently under someone else's label.
+  const rows: { ruleId: string; label: string }[] = []
+  const seen = new Set<string>()
+  for (const date of dates) {
+    for (const r of verdicts[date]?.results ?? []) {
+      if (!seen.has(r.ruleId)) {
+        seen.add(r.ruleId)
+        rows.push({ ruleId: r.ruleId, label: r.label })
+      }
+    }
+  }
+  if (rows.length === 0) return null
+
+  // One lookup map per date, built once, so each cell is a ruleId lookup
+  // rather than a per-cell `find` over that date's results array.
+  const byDate = new Map(dates.map(date => [date, new Map(verdicts[date]?.results.map(r => [r.ruleId, r]))]))
 
   return (
     <tbody className="counts">
-      {first.results.map((rule, i) => (
-        <tr key={rule.ruleId} data-testid={`count-${rule.ruleId}`}>
-          <td className="who">{rule.label}</td>
+      {rows.map(({ ruleId, label }) => (
+        <tr key={ruleId} data-testid={`count-${ruleId}`}>
+          <td className="who">{label}</td>
           {dates.map(date => {
-            const r = verdicts[date]?.results[i]
+            const r = byDate.get(date)?.get(ruleId)
             if (!r) return <td key={date} />
             return (
               <td
                 key={date}
-                data-testid={`count-${rule.ruleId}-${date}`}
+                data-testid={`count-${ruleId}-${date}`}
                 className={r.verdict === 'ok' ? '' : r.verdict}
-                title={`${rule.label}: ${show(r.have)} available, amber ${r.amber}, red ${r.red}`}
+                title={`${label}: ${show(r.have)} available, amber ${r.amber}, red ${r.red}`}
               >
                 {show(r.have)}
               </td>
