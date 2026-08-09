@@ -82,6 +82,17 @@ describe('Matrix', () => {
     expect(screen.getByTestId('head-2026-01-06').className).not.toContain('weekend')
   })
 
+  it('marks the blocked week\'s Saturday as both blocked and weekend', () => {
+    // The seed's exercise week runs through 2026-03-14 (Saturday) precisely
+    // so this overlap exists in the data. jsdom computes no cascade, so this
+    // only proves both classes are emitted — it cannot see which background
+    // wins. That's covered by the e2e spec instead.
+    render(<Matrix />)
+    const head = screen.getByTestId('head-2026-03-14')
+    expect(head.className).toContain('blocked')
+    expect(head.className).toContain('weekend')
+  })
+
   it('shows both the blocked reason and the day\'s events when both exist', () => {
     // The seed's blocked week carries no events, so this is exercised by
     // hand: a day that is both blocked and carries an event line, which the

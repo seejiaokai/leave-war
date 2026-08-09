@@ -46,12 +46,18 @@
   min-width: 30px;
 }
 
-.mx .blocked {
-  background: #FFA500;
-}
-
 .mx .weekend {
   background: #f0f0f0;
+}
+
+/* Declared after .weekend on purpose: both rules share specificity (0,2,0),
+   so the later rule wins the cascade on a header carrying both classes
+   (a blocked day that falls on a weekend). Blocked must win — it's the
+   squadron being told leave is discouraged, which matters more than the
+   fact that the day is also a Saturday. Do not reorder this back above
+   .weekend, and do not "tidy" it without re-checking the cascade. */
+.mx .blocked {
+  background: #FFA500;
 }
 
 .mx td.duty {

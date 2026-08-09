@@ -63,6 +63,18 @@ test('a blocked day is painted orange on its header, and an ordinary day is not'
   expect(plain).not.toBe('rgb(255, 165, 0)')
 })
 
+test('a blocked day that falls on a weekend still paints orange, not grey', async ({ page }) => {
+  // 2026-03-14 is the Saturday inside the seed's exercise week: it carries
+  // both `.blocked` and `.weekend`. jsdom-based unit tests can only prove
+  // both classes were emitted, which was already true while the CSS cascade
+  // bug was live — only a real browser computes which background wins.
+  const head = page.locator('[data-testid="head-2026-03-14"]')
+  expect(await head.evaluate(el => el.className)).toContain('blocked')
+  expect(await head.evaluate(el => el.className)).toContain('weekend')
+  const bg = await head.evaluate(el => getComputedStyle(el).backgroundColor)
+  expect(bg).toBe('rgb(255, 165, 0)')
+})
+
 test('the matrix stays within a sane DOM size', async ({ page }) => {
   // 16 people x 90 days plus counts and headers. Measured 2227 nodes on
   // 2026-08-09; ceiling set with modest headroom above that, not as a

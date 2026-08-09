@@ -53,7 +53,10 @@ export function seedPeriod(): Period {
       d.events[0] = 'PH'
     }
     // A week of heavy tasking where leave is discouraged but still biddable.
-    if (d.date >= '2026-03-09' && d.date <= '2026-03-13') {
+    // Runs through Saturday 2026-03-14 on purpose: exercises spill into
+    // weekends, and this gives the blocked+weekend header overlap real
+    // seed coverage instead of only existing in a synthetic test.
+    if (d.date >= '2026-03-09' && d.date <= '2026-03-14') {
       d.blocked = true
       d.blockedReason = 'Exercise week'
     }
