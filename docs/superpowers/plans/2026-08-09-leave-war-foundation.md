@@ -63,10 +63,14 @@ Every task's requirements implicitly include these.
     "jsdom": "^25.0.1",
     "typescript": "^5.7.2",
     "vite": "^6.0.5",
-    "vitest": "^2.1.8"
+    "vitest": "^3.0.0"
   }
 }
 ```
+
+Vitest must be `^3` or later alongside Vite 6. The whole 2.1.x line carries
+Vite `^5` as a hard dependency rather than a peer, so the two resolve to
+different Vite copies and `tsc -b` fails on a plugin type conflict.
 
 - [ ] **Step 2: Create the TypeScript and Vite configs**
 
@@ -182,7 +186,14 @@ dist/
 test-results/
 playwright-report/
 *.local
+*.tsbuildinfo
+.superpowers/
 ```
+
+`*.tsbuildinfo` because the `build` script runs `tsc -b`, which writes a cache
+file per project to the repo root. `.superpowers/` because that is the
+subagent workspace — briefs, reports and the progress ledger — and it is
+scratch, never source.
 
 - [ ] **Step 5: Write the scaffold test**
 
