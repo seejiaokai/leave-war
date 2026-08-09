@@ -93,6 +93,26 @@ describe('Matrix', () => {
     expect(head.className).toContain('weekend')
   })
 
+  it('labels the first day of a month, and only the first day', () => {
+    render(<Matrix />)
+    const jan1 = screen.getByTestId('head-2026-01-01')
+    expect(jan1.querySelector('.mon')?.textContent).toBe('JAN')
+    const jan2 = screen.getByTestId('head-2026-01-02')
+    expect(jan2.querySelector('.mon')).toBeNull()
+    const feb1 = screen.getByTestId('head-2026-02-01')
+    expect(feb1.querySelector('.mon')?.textContent).toBe('FEB')
+  })
+
+  it('gives a duty cell the sc chip class and an ordinary code the info chip class', () => {
+    render(<Matrix />)
+    // Seed: TATA is on FS (a duty code) on 1 Jan, and on OIL (an ordinary
+    // code) on 9 Jan.
+    const dutyCell = screen.getByTestId('cell-tata-2026-01-01')
+    expect(dutyCell.querySelector('.c.sc')?.textContent).toBe('FS')
+    const ordinaryCell = screen.getByTestId('cell-tata-2026-01-09')
+    expect(ordinaryCell.querySelector('.c.info')?.textContent).toBe('OIL')
+  })
+
   it('shows both the blocked reason and the day\'s events when both exist', () => {
     // The seed's blocked week carries no events, so this is exercised by
     // hand: a day that is both blocked and carries an event line, which the
