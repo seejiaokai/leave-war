@@ -53,17 +53,22 @@ test('the page itself never scrolls sideways — only the grid does', async ({ p
   expect(overflow).toBeLessThanOrEqual(1)
 })
 
-test('a blocked day is painted orange on its header, and an ordinary day is not', async ({ page }) => {
+// The Raptor restyle repaints .blocked as a tinted amber fill
+// (rgba(229, 168, 59, 0.22)) rather than a solid rgb(255, 165, 0) — see the
+// cascade-order comment on `.mx thead th.blocked` in matrix.css.
+const BLOCKED_BG = 'rgba(229, 168, 59, 0.22)'
+
+test('a blocked day is painted amber on its header, and an ordinary day is not', async ({ page }) => {
   const blocked = await page.locator('[data-testid="head-2026-03-10"]')
     .evaluate(el => getComputedStyle(el).backgroundColor)
-  expect(blocked).toBe('rgb(255, 165, 0)')
+  expect(blocked).toBe(BLOCKED_BG)
 
   const plain = await page.locator('[data-testid="head-2026-01-07"]')
     .evaluate(el => getComputedStyle(el).backgroundColor)
-  expect(plain).not.toBe('rgb(255, 165, 0)')
+  expect(plain).not.toBe(BLOCKED_BG)
 })
 
-test('a blocked day that falls on a weekend still paints orange, not grey', async ({ page }) => {
+test('a blocked day that falls on a weekend still paints amber, not grey', async ({ page }) => {
   // 2026-03-14 is the Saturday inside the seed's exercise week: it carries
   // both `.blocked` and `.weekend`. jsdom-based unit tests can only prove
   // both classes were emitted, which was already true while the CSS cascade
@@ -72,13 +77,16 @@ test('a blocked day that falls on a weekend still paints orange, not grey', asyn
   expect(await head.evaluate(el => el.className)).toContain('blocked')
   expect(await head.evaluate(el => el.className)).toContain('weekend')
   const bg = await head.evaluate(el => getComputedStyle(el).backgroundColor)
-  expect(bg).toBe('rgb(255, 165, 0)')
+  expect(bg).toBe(BLOCKED_BG)
 })
 
 test('the matrix stays within a sane DOM size', async ({ page }) => {
   // 16 people x 90 days plus counts and headers. Measured 2227 nodes on
-  // 2026-08-09; ceiling set with modest headroom above that, not as a
-  // target: raising it is a deliberate edit in the PR that adds the nodes.
+  // 2026-08-09, before the Raptor restyle. The chip-span wrapper the
+  // restyle adds around every populated cell's text pushed that to 2330
+  // nodes, measured 2026-08-09 — still comfortably under the ceiling, which
+  // stays at 2500 (headroom, not a target): raising it is a deliberate edit
+  // in the PR that adds the nodes.
   const nodes = await page.evaluate(() => document.querySelectorAll('.mx *').length)
   // A missing `.mx` would make this 0, which is comfortably "less than the
   // ceiling" — assert it's also nonzero so an absent grid fails loudly
