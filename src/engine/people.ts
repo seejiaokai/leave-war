@@ -7,8 +7,6 @@ export type Seat = 'pilot' | 'wso'
 export type Band = 'instructor' | 'ops'
 export type Category = 'IP' | 'OPSP' | 'IWSO' | 'OPSW'
 
-export const CATEGORIES: Category[] = ['IP', 'OPSP', 'IWSO', 'OPSW']
-
 export interface Person {
   id: string
   callsign: string
