@@ -1,4 +1,4 @@
-import { categoryOf, codeOf, evaluatePeriod, inSquadron } from '../engine'
+import { categoryOf, evaluatePeriod, inSquadron, isDuty, isWeekend } from '../engine'
 import { getState } from '../state/store'
 import { CountRows } from './CountRows'
 import { useVersion } from './useStore'
@@ -20,8 +20,10 @@ export function Matrix() {
               <th
                 key={d.date}
                 data-testid={`head-${d.date}`}
-                className={`day${d.blocked ? ' blocked' : ''}`}
-                title={d.blocked ? d.blockedReason : d.events.filter(Boolean).join(' / ')}
+                className={`day${d.blocked ? ' blocked' : ''}${isWeekend(d.date) ? ' weekend' : ''}`}
+                title={[d.blocked ? d.blockedReason : '', d.events.filter(Boolean).join(' / ')]
+                  .filter(Boolean)
+                  .join(' — ')}
               >
                 {d.date.slice(8)}
               </th>
@@ -39,13 +41,18 @@ export function Matrix() {
               {period.days.map(d => {
                 const code = grid[p.id]?.[d.date] ?? ''
                 const here = inSquadron(p, d.date)
+                // `here` is false on both sides of the roster window. Before
+                // `from` the person has not arrived yet — that is not the
+                // same fact as having been posted out, and must not read as
+                // one. Only the "after `to`" direction is a genuine PO.
+                const notYetArrived = !here && p.from !== null && d.date < p.from
                 const cls = [
                   here ? '' : 'gone',
-                  codeOf(code)?.duty ? 'duty' : '',
+                  here && isDuty(code) ? 'duty' : '',
                 ].filter(Boolean).join(' ')
                 return (
                   <td key={d.date} data-testid={`cell-${p.id}-${d.date}`} className={cls}>
-                    {here ? code : 'PO'}
+                    {here ? code : notYetArrived ? '' : 'PO'}
                   </td>
                 )
               })}

@@ -1,6 +1,7 @@
 import { render, screen, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it } from 'vitest'
-import { initStore, setCell } from '../state/store'
+import type { Person } from '../engine'
+import { getState, initStore, setCell } from '../state/store'
 import { memoryBackend } from '../state/storage'
 import { Matrix } from './Matrix'
 
@@ -42,5 +43,54 @@ describe('Matrix', () => {
     render(<Matrix />)
     expect(screen.getByTestId('cell-switcher-2026-01-12').className).not.toContain('gone')
     expect(screen.getByTestId('cell-switcher-2026-01-13').className).toContain('gone')
+  })
+
+  it('does not label a member who has not yet arrived as posted out', () => {
+    // The seed has nobody with a `from`, which is why this survived past
+    // review — give the test its own person rather than relying on seed data.
+    const arriving: Person = {
+      id: 'newbie', callsign: 'NEWBIE', seat: 'pilot', band: 'ops',
+      sxo: false, from: '2026-02-01', to: null,
+    }
+    getState().people.push(arriving)
+    render(<Matrix />)
+
+    const beforeArrival = screen.getByTestId('cell-newbie-2026-01-15')
+    expect(beforeArrival.textContent).not.toBe('PO')
+    expect(beforeArrival.textContent).toBe('')
+    expect(beforeArrival.className).toContain('gone')
+
+    const onArrival = screen.getByTestId('cell-newbie-2026-02-01')
+    expect(onArrival.textContent).not.toBe('PO')
+    expect(onArrival.className).not.toContain('gone')
+  })
+
+  it('suppresses the duty class for a code left on a day outside the roster window', () => {
+    // A stale FS on a posted-out member's row must not read as "at work" —
+    // they are gone, full stop, regardless of what code sits under them.
+    setCell('switcher', '2026-01-13', 'FS')
+    render(<Matrix />)
+    const cell = screen.getByTestId('cell-switcher-2026-01-13')
+    expect(cell.className).toContain('gone')
+    expect(cell.className).not.toContain('duty')
+    expect(cell.textContent).toBe('PO')
+  })
+
+  it('marks a Saturday header as a weekend and a Tuesday as not', () => {
+    render(<Matrix />)
+    expect(screen.getByTestId('head-2026-01-03').className).toContain('weekend')
+    expect(screen.getByTestId('head-2026-01-06').className).not.toContain('weekend')
+  })
+
+  it('shows both the blocked reason and the day\'s events when both exist', () => {
+    // The seed's blocked week carries no events, so this is exercised by
+    // hand: a day that is both blocked and carries an event line, which the
+    // old `blocked ? reason : events` title would make the event invisible.
+    const day = getState().period.days.find(d => d.date === '2026-03-09')!
+    day.events = ['Range closure', '']
+    render(<Matrix />)
+    const head = screen.getByTestId('head-2026-03-09')
+    expect(head.title).toContain('Exercise week')
+    expect(head.title).toContain('Range closure')
   })
 })

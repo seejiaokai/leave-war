@@ -6,7 +6,7 @@
 // Both are fixed here: availability is fractional, and duty is reported on its
 // own line rather than hidden inside the shortfall.
 
-import { codeOf } from './codes'
+import { codeOf, isDuty } from './codes'
 import { categoryOf, inSquadron, type Category, type Person } from './people'
 
 /** `personId -> date -> code`. Sparse: most cells are empty. */
@@ -41,7 +41,7 @@ export function countsFor(people: Person[], grid: Grid, date: string): DayCounts
 
   for (const p of people) {
     const code = grid[p.id]?.[date]
-    if (inSquadron(p, date) && codeOf(code)?.duty) duty += 1
+    if (inSquadron(p, date) && isDuty(code)) duty += 1
 
     const have = availabilityOf(p, date, code)
     if (have === 0) continue
