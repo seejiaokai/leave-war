@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import {
   canBid,
+  canDecide,
   categoryOf,
   evaluatePeriod,
   inSquadron,
@@ -11,7 +12,7 @@ import {
   stateOf,
 } from '../engine'
 import { getState } from '../state/store'
-import { BidPicker } from './BidPicker'
+import { BidPicker, DecisionSheet } from './BidPicker'
 import { CountRows } from './CountRows'
 import { useVersion } from './useStore'
 import './matrix.css'
@@ -38,6 +39,14 @@ export function Matrix() {
   const [open, setOpen] = useState<{ id: string; callsign: string; date: string } | null>(null)
   const close = () => setOpen(null)
   const bidding = canBid(period.stage)
+  const deciding = canDecide(period.stage)
+
+  // Which sheet a click opens follows from the stage and from what the cell
+  // already holds. Deciding needs an existing bid to decide: a course, a
+  // sick day and an empty cell are all things nobody asked for, so there is
+  // nothing there to approve or refuse.
+  const openable = (personId: string, date: string): boolean =>
+    bidding || (deciding && isBiddable(grid[personId]?.[date]))
 
   return (
     <div className="stage">
@@ -126,7 +135,7 @@ export function Matrix() {
                     // A cell outside the person's time in the squadron is
                     // never actionable: bidding leave for a man who has been
                     // posted out is a data-entry accident, not a bid.
-                    const actionable = here && bidding
+                    const actionable = here && openable(p.id, d.date)
                     return (
                       <td
                         key={d.date}
@@ -158,6 +167,16 @@ export function Matrix() {
           personId={open.id}
           date={open.date}
           current={grid[open.id]?.[open.date] ?? ''}
+          onClose={close}
+        />
+      )}
+      {open && deciding && isBiddable(grid[open.id]?.[open.date]) && (
+        <DecisionSheet
+          callsign={open.callsign}
+          personId={open.id}
+          date={open.date}
+          code={grid[open.id][open.date]}
+          state={stateOf(states, open.id, open.date)}
           onClose={close}
         />
       )}

@@ -14,8 +14,8 @@
 // rather than against a signed-in person — see `docs/known-gaps.md`.
 
 import { useState } from 'react'
-import { formatCell, LEAVE_TYPES, type Portion } from '../engine'
-import { setCell } from '../state/store'
+import { formatCell, LEAVE_TYPES, type BidState, type Portion } from '../engine'
+import { setBidState, setCell } from '../state/store'
 import './bidpicker.css'
 
 const PORTIONS: { portion: Portion; label: string; testid: string }[] = [
@@ -92,6 +92,73 @@ export function BidPicker({
         ))}
         <button className="tchip clear" data-testid="bid-clear" onClick={() => write('')}>
           Clear
+        </button>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Approve or refuse a bid, once bidding has closed.
+ *
+ * Deliberately NOT role-gated: this prototype has no login, so anyone can
+ * decide anything. That is a consequence of deferring accounts to the
+ * backend, recorded in `docs/known-gaps.md` — it is not a security model and
+ * must not be presented as one.
+ *
+ * Reuses the bid sheet's shell so a decision and a bid read as the same
+ * object in the same place, rather than as two unrelated surfaces.
+ */
+export function DecisionSheet({
+  callsign,
+  personId,
+  date,
+  code,
+  state,
+  onClose,
+}: {
+  callsign: string
+  personId: string
+  date: string
+  code: string
+  state: BidState | undefined
+  onClose: () => void
+}) {
+  const decide = (bid: BidState) => {
+    setBidState(personId, date, bid)
+    onClose()
+  }
+
+  return (
+    <div className="bidsheet" data-testid="bid-picker" role="dialog" aria-label="Decide a bid">
+      <div className="bidsheet-hd">
+        <span className="who">{callsign}</span>
+        <span className="dt">{date}</span>
+        <span className="cur">{code}{state ? ` · ${state}` : ''}</span>
+        <button className="x" data-testid="bid-cancel" onClick={onClose} aria-label="Cancel">
+          ✕
+        </button>
+      </div>
+      <div className="bidsheet-row">
+        <span className="lab">Decision</span>
+        {/* Both stay enabled on an already-decided bid. Management is meant
+            to try one and watch the count rows move, and a decision that
+            could not be changed back would make that a one-way door. */}
+        <button
+          className="dchip approve"
+          data-testid="decide-approve"
+          aria-pressed={state === 'approved'}
+          onClick={() => decide('approved')}
+        >
+          Approve
+        </button>
+        <button
+          className="dchip refuse"
+          data-testid="decide-refuse"
+          aria-pressed={state === 'refused'}
+          onClick={() => decide('refused')}
+        >
+          Refuse
         </button>
       </div>
     </div>

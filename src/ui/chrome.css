@@ -172,3 +172,32 @@
   color: var(--ink-3);
   font-weight: 700;
 }
+
+/* The stage control. Deliberately quieter than the stage chip beside it —
+   the chip is the fact, this is the action on it, and a louder button would
+   invite a click on a one-way transition. Sized to match `.fchip` so the
+   two sit on the same line without the strip looking assembled. */
+.stage-go {
+  background: transparent;
+  border: 1px solid var(--edge);
+  color: var(--ink-3);
+  padding: 6px 11px;
+  border-radius: 9px;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.stage-go:hover:not([disabled]) {
+  border-color: rgba(59, 198, 232, .5);
+  color: var(--accent);
+}
+
+/* At published there is nowhere to go, and the cycle is forward only, so
+   this is the end state rather than a temporarily unavailable action. */
+.stage-go[disabled] {
+  opacity: .4;
+  cursor: default;
+}

@@ -3,8 +3,8 @@
 // yet (My leave, Ledger, Rules, Roster) and no "closes in N days", which
 // the engine does not model. See CLAUDE-facing restyle brief for why.
 
-import { evaluatePeriod, stageLabel } from '../engine'
-import { getState } from '../state/store'
+import { evaluatePeriod, nextStage, stageLabel } from '../engine'
+import { advanceStage, getState } from '../state/store'
 import { useVersion } from './useStore'
 import './chrome.css'
 
@@ -45,6 +45,7 @@ export function StageBar() {
   // from the one the grid below it is painting.
   const verdicts = evaluatePeriod(people, grid, states, requirements, dates)
   const redDays = dates.filter(d => verdicts[d].verdict === 'red').length
+  const next = nextStage(period.stage)
 
   return (
     <div className="filters">
@@ -55,6 +56,22 @@ export function StageBar() {
       >
         {stageLabel(period.stage)}
       </span>
+      {/* The control sits beside the stage it moves, so the strip reads as
+          one thing rather than as a label and an unrelated button. It names
+          the stage it will move TO — the label answers "what does this do",
+          which the current stage is already showing two chips to the left.
+          Forward only, and disabled at the end of the cycle: `nextStage`
+          owns which transitions exist and this asks it rather than deciding
+          for itself. */}
+      <button
+        className="stage-go"
+        data-testid="stage-advance"
+        disabled={next === null}
+        title={next ? `Move this period to ${stageLabel(next)}` : 'The cycle ends at published'}
+        onClick={advanceStage}
+      >
+        → {next ? stageLabel(next) : 'END OF CYCLE'}
+      </button>
       <span className="lab" style={{ marginLeft: 12 }}>Under-manned</span>
       <span className={`fchip${redDays > 0 ? ' undermanned' : ''}`} data-testid="undermanned">
         {redDays} day{redDays === 1 ? '' : 's'}
