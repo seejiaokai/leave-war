@@ -1,6 +1,6 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { getState, getVersion, initStore, setCell, subscribe } from './store'
-import { memoryBackend } from './storage'
+import { localBackend, memoryBackend } from './storage'
 
 beforeEach(() => {
   initStore(memoryBackend())
@@ -57,5 +57,69 @@ describe('store', () => {
     initStore(backend)
     expect(getState().grid).toBeTypeOf('object')
     expect(getState().people.length).toBeGreaterThan(0)
+  })
+
+  // The three shapes below all parse as valid JSON but are not a plain
+  // object, so each must be caught by the `typeof !== 'object' ||
+  // Array.isArray` guard rather than the try/catch (which only sees
+  // JSON.parse throw). Each is asserted against a seed-only value
+  // ('ramp' → 'OL' on 2026-01-01, per seedGrid) so a fallback to `{}`
+  // would not accidentally pass.
+  it.each([
+    ['an array', '[]'],
+    ['null', 'null'],
+    ['a bare primitive', '42'],
+  ])('falls back to the seed when the backend holds %s as the grid', (_label, raw) => {
+    const backend = memoryBackend()
+    backend.write('grid', raw)
+    initStore(backend)
+    expect(getState().grid).toBeTypeOf('object')
+    expect(Array.isArray(getState().grid)).toBe(false)
+    expect(getState().grid.ramp?.['2026-01-01']).toBe('OL')
+  })
+})
+
+describe('localBackend', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('reads back what it writes through real localStorage', () => {
+    const backend = localBackend()
+    backend.write('grid', '{"ramp":{"2026-01-20":"LL"}}')
+    expect(backend.read('grid')).toBe('{"ramp":{"2026-01-20":"LL"}}')
+  })
+
+  // Private browsing and disabled storage both throw on any localStorage
+  // access, not just on write. A leave war that cannot persist should still
+  // open and read, so the backend must swallow the throw rather than take
+  // the page down.
+  it('degrades instead of throwing when localStorage is unavailable', () => {
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new Error('storage denied')
+    })
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('storage denied')
+    })
+    const backend = localBackend()
+    expect(backend.read('grid')).toBeNull()
+    expect(() => backend.write('grid', 'x')).not.toThrow()
+  })
+})
+
+describe('initStore subscriber contract', () => {
+  // Deliberate, not a bug: initStore() represents a fresh boot of the store
+  // (a new backend, a reset version, a clean slate), so it drops all
+  // subscribers rather than carrying old ones into the new session. The
+  // hazard is that calling initStore() after a component has mounted and
+  // subscribed will silently strand that subscriber — no error, no signal,
+  // it just stops receiving updates. Any change to this behaviour should be
+  // deliberate, which is what this test pins down.
+  it('drops subscribers registered before a later initStore call', () => {
+    const fn = vi.fn()
+    subscribe(fn)
+    initStore(memoryBackend())
+    setCell('ramp', '2026-01-25', 'LL')
+    expect(fn).not.toHaveBeenCalled()
   })
 })
