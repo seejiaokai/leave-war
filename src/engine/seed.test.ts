@@ -19,6 +19,13 @@ describe('seed', () => {
     expect(seedPeople().some(p => p.to !== null)).toBe(true)
   })
 
+  it('gives every seeded person a unique id', () => {
+    // Duplicate callsigns would collide on id (lowercased callsign), giving
+    // duplicate React keys and a shared grid row between two people.
+    const ids = seedPeople().map(p => p.id)
+    expect(new Set(ids).size).toBe(ids.length)
+  })
+
   it('covers the first quarter of 2026', () => {
     const period = seedPeriod()
     expect(period.start).toBe('2026-01-01')
@@ -45,6 +52,9 @@ describe('seed', () => {
     const people = seedPeople()
     const peopleIds = new Set(people.map(p => p.id))
     const grid = seedGrid()
+    // Without this, seedGrid() returning {} would pass the loop below
+    // vacuously — assert the collection actually has something to check.
+    expect(Object.keys(grid).length).toBeGreaterThan(0)
     for (const id of Object.keys(grid)) {
       if (!peopleIds.has(id)) {
         throw new Error(`grid contains unknown id: ${id}`)
@@ -54,6 +64,10 @@ describe('seed', () => {
 
   it('grid codes all resolve in the catalogue', () => {
     const grid = seedGrid()
+    const allCodes = Object.values(grid).flatMap(days => Object.values(days))
+    // Without this, an empty grid (or one whose rows are all empty) would
+    // pass the loop below vacuously — assert there is something to check.
+    expect(allCodes.length).toBeGreaterThan(0)
     for (const [id, days] of Object.entries(grid)) {
       for (const [date, code] of Object.entries(days)) {
         const resolved = codeOf(code)

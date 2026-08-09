@@ -37,6 +37,14 @@ describe('count rows', () => {
     expect(screen.getByTestId('count-ip-2026-01-01').textContent).toBe('2')
   })
 
+  it('shows a real set figure for a day, not just that the row exists', () => {
+    render(<Matrix />)
+    // 2026-01-02 has nobody on leave or duty in the seed grid: 9 pilots and
+    // 7 WSOs are all fully available, so the constraining seat (WSO) caps
+    // sets at 7.
+    expect(screen.getByTestId('count-sets-2026-01-02').textContent).toBe('7')
+  })
+
   it('counts a half day as a half, which the spreadsheet could not', () => {
     setCell('cross', '2026-02-05', 'AM')
     render(<Matrix />)
