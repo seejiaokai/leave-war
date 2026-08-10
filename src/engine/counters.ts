@@ -77,28 +77,41 @@ export function grantedTo(ledger: Ledger, personId: string, counter: CounterName
   return total
 }
 
+/** Just enough of a leave war to draw a counter from. `LeaveWar` satisfies
+ *  it structurally, so callers pass their wars straight in. */
+export interface LeaveSource {
+  grid: Grid
+  states: States
+}
+
 /**
- * How much of one counter this person's leave has spent.
+ * How much of one counter this person's leave has spent, **across every
+ * leave war**.
+ *
+ * Taking a list rather than one war is the whole point: entitlements are
+ * continuous and leave wars are windows onto them. Annual leave does not
+ * reset when a quarter closes, so leave bid in Jan–Mar still spends it while
+ * someone is looking at Apr–Jun. A figure counting only the war on screen
+ * would let the same twenty days be bid twice over, once in each.
  *
  * Which cells count is decided by `removesAvailability` — the SAME function
  * the manning rows use, not a second copy of the rule. So a refused bid
  * draws nothing, a pending one draws in full, and a half day draws 0.5,
- * exactly as the counts on screen already behave. A bidder cannot ask for
- * leave they have already asked for, which is the point of showing the
- * figure at all.
+ * exactly as the counts on screen already behave.
  */
 export function drawnFrom(
-  grid: Grid,
-  states: States,
+  sources: LeaveSource[],
   personId: string,
   counter: CounterName,
 ): number {
   let total = 0
-  for (const [date, code] of Object.entries(grid[personId] ?? {})) {
-    const spends = codeOf(code)?.spends
-    if (!spends || spends.counter !== counter) continue
-    if (!removesAvailability(code, stateOf(states, personId, date))) continue
-    total += spends.amount
+  for (const { grid, states } of sources) {
+    for (const [date, code] of Object.entries(grid[personId] ?? {})) {
+      const spends = codeOf(code)?.spends
+      if (!spends || spends.counter !== counter) continue
+      if (!removesAvailability(code, stateOf(states, personId, date))) continue
+      total += spends.amount
+    }
   }
   return total
 }
@@ -114,11 +127,10 @@ export function drawnFrom(
 export function balanceOf(
   openings: Openings,
   ledger: Ledger,
-  grid: Grid,
-  states: States,
+  sources: LeaveSource[],
   personId: string,
   counter: CounterName,
 ): number {
   const opening = openings[personId]?.[counter] ?? 0
-  return opening + grantedTo(ledger, personId, counter) - drawnFrom(grid, states, personId, counter)
+  return opening + grantedTo(ledger, personId, counter) - drawnFrom(sources, personId, counter)
 }

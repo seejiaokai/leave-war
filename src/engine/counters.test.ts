@@ -52,21 +52,21 @@ describe('drawnFrom', () => {
   it('draws local and overseas leave from the same annual pool', () => {
     const grid: Grid = { ramp: { '2026-01-05': 'LL', '2026-01-06': 'OL' } }
     const states: States = { ramp: { '2026-01-05': approved(), '2026-01-06': approved() } }
-    expect(drawnFrom(grid, states, 'ramp', 'annual')).toBe(2)
+    expect(drawnFrom([{ grid: grid, states: states }], 'ramp', 'annual')).toBe(2)
   })
 
   it('draws a half day as half', () => {
     const grid: Grid = { ramp: { '2026-01-07': '*LL' } }
-    expect(drawnFrom(grid, { ramp: { '2026-01-07': approved() } }, 'ramp', 'annual')).toBe(0.5)
+    expect(drawnFrom([{ grid: grid, states: { ramp: { '2026-01-07': approved() } } }], 'ramp', 'annual')).toBe(0.5)
     const pm: Grid = { ramp: { '2026-01-07': 'LL*' } }
-    expect(drawnFrom(pm, { ramp: { '2026-01-07': approved() } }, 'ramp', 'annual')).toBe(0.5)
+    expect(drawnFrom([{ grid: pm, states: { ramp: { '2026-01-07': approved() } } }], 'ramp', 'annual')).toBe(0.5)
   })
 
   it('draws OIL from the OIL counter and nothing from annual', () => {
     const grid: Grid = { ramp: { '2026-01-08': 'OIL' } }
     const states: States = { ramp: { '2026-01-08': approved() } }
-    expect(drawnFrom(grid, states, 'ramp', 'oil')).toBe(1)
-    expect(drawnFrom(grid, states, 'ramp', 'annual')).toBe(0)
+    expect(drawnFrom([{ grid: grid, states: states }], 'ramp', 'oil')).toBe(1)
+    expect(drawnFrom([{ grid: grid, states: states }], 'ramp', 'annual')).toBe(0)
   })
 
   // The same worst-case rule the manning rows already use, reached through
@@ -74,35 +74,35 @@ describe('drawnFrom', () => {
   // asked for twice.
   it('draws a pending bid, so nobody can bid leave they have already asked for', () => {
     const grid: Grid = { ramp: { '2026-01-05': 'LL' } }
-    expect(drawnFrom(grid, { ramp: { '2026-01-05': pending } }, 'ramp', 'annual')).toBe(1)
+    expect(drawnFrom([{ grid: grid, states: { ramp: { '2026-01-05': pending } } }], 'ramp', 'annual')).toBe(1)
   })
 
   it('draws nothing for a refused bid — he did not get the day', () => {
     const grid: Grid = { ramp: { '2026-01-05': 'LL' } }
-    expect(drawnFrom(grid, { ramp: { '2026-01-05': refused } }, 'ramp', 'annual')).toBe(0)
+    expect(drawnFrom([{ grid: grid, states: { ramp: { '2026-01-05': refused } } }], 'ramp', 'annual')).toBe(0)
   })
 
   it('draws a bid with no decision recorded, which reads as pending', () => {
     const grid: Grid = { ramp: { '2026-01-05': 'LL' } }
-    expect(drawnFrom(grid, {}, 'ramp', 'annual')).toBe(1)
+    expect(drawnFrom([{ grid: grid, states: {} }], 'ramp', 'annual')).toBe(1)
   })
 
   // Leave entered on Raptor's input tab was approved verbally. It has been
   // taken, so it spends exactly as an approved bid does.
   it('draws leave Raptor owns, the same as an approved bid', () => {
     const grid: Grid = { ramp: { '2026-01-05': 'LL' } }
-    expect(drawnFrom(grid, { ramp: { '2026-01-05': approved('raptor') } }, 'ramp', 'annual')).toBe(1)
+    expect(drawnFrom([{ grid: grid, states: { ramp: { '2026-01-05': approved('raptor') } } }], 'ramp', 'annual')).toBe(1)
   })
 
   it('draws nothing for codes that spend no counter', () => {
     for (const code of ['CSE', 'M', 'OD', 'FS', 'HS']) {
       const grid: Grid = { ramp: { '2026-01-09': code } }
-      for (const c of COUNTERS) expect(drawnFrom(grid, {}, 'ramp', c)).toBe(0)
+      for (const c of COUNTERS) expect(drawnFrom([{ grid: grid, states: {} }], 'ramp', c)).toBe(0)
     }
   })
 
   it('draws nothing for a person with no cells at all', () => {
-    expect(drawnFrom({ ramp: { '2026-01-05': 'LL' } }, {}, 'nobody', 'annual')).toBe(0)
+    expect(drawnFrom([{ grid: { ramp: { '2026-01-05': 'LL' } }, states: {} }], 'nobody', 'annual')).toBe(0)
   })
 
   it('sums a whole quarter of mixed cells', () => {
@@ -113,7 +113,7 @@ describe('drawnFrom', () => {
       ramp: { '2026-01-05': approved(), '2026-01-06': refused, '2026-01-07': pending },
     }
     // LL approved (1) + OL refused (0) + *LL pending (0.5), course ignored.
-    expect(drawnFrom(grid, states, 'ramp', 'annual')).toBe(1.5)
+    expect(drawnFrom([{ grid: grid, states: states }], 'ramp', 'annual')).toBe(1.5)
   })
 })
 
@@ -155,13 +155,13 @@ describe('balanceOf', () => {
 
   it('is the opening figure plus grants less what the grid has drawn', () => {
     // 10 opening + 14 granted - 2 taken (LL approved, OL pending) = 22
-    expect(balanceOf(openings, ledger, grid, states, 'ramp', 'annual')).toBe(22)
-    expect(balanceOf(openings, ledger, grid, states, 'ramp', 'oil')).toBe(0)
+    expect(balanceOf(openings, ledger, [{ grid, states }], 'ramp', 'annual')).toBe(22)
+    expect(balanceOf(openings, ledger, [{ grid, states }], 'ramp', 'oil')).toBe(0)
   })
 
   it('treats a missing opening figure as nothing rather than throwing', () => {
-    expect(balanceOf({}, [], {}, {}, 'nobody', 'annual')).toBe(0)
-    expect(balanceOf(openings, ledger, grid, states, 'ramp', 'ccl')).toBe(0)
+    expect(balanceOf({}, [], [{ grid: {}, states: {} }], 'nobody', 'annual')).toBe(0)
+    expect(balanceOf(openings, ledger, [{ grid, states }], 'ramp', 'ccl')).toBe(0)
   })
 
   // §Counters: balances already go negative in the real sheet — annual at
@@ -169,17 +169,60 @@ describe('balanceOf', () => {
   // must not clamp.
   it('goes negative rather than clamping at zero', () => {
     const thin: Openings = { ramp: { annual: 1 } }
-    expect(balanceOf(thin, [], grid, states, 'ramp', 'annual')).toBe(-1)
+    expect(balanceOf(thin, [], [{ grid, states }], 'ramp', 'annual')).toBe(-1)
   })
 
   it('gives a refusal back to the balance', () => {
     const allRefused: States = { ramp: { '2026-01-05': refused, '2026-01-06': refused } }
-    expect(balanceOf(openings, ledger, grid, allRefused, 'ramp', 'annual')).toBe(24)
+    expect(balanceOf(openings, ledger, [{ grid, states: allRefused }], 'ramp', 'annual')).toBe(24)
   })
 
   // Nothing rounds anywhere else in this engine and nothing rounds here.
   it('stays fractional', () => {
     const half: Grid = { ramp: { '2026-01-05': '*LL' } }
-    expect(balanceOf({ ramp: { annual: 1 } }, [], half, {}, 'ramp', 'annual')).toBe(0.5)
+    expect(balanceOf({ ramp: { annual: 1 } }, [], [{ grid: half, states: {} }], 'ramp', 'annual')).toBe(0.5)
+  })
+})
+
+describe('balances across more than one leave war', () => {
+  // THE point of the multi-war change, and the thing most easily got wrong.
+  // Leave bid in the Jan–Mar war still spends annual leave while you are
+  // looking at Apr–Jun. A balance that only counted the war on screen would
+  // let the same twenty days be bid twice over.
+  const openings: Openings = { ramp: { annual: 20 } }
+  const q1 = {
+    grid: { ramp: { '2026-02-10': 'LL', '2026-02-11': 'LL' } },
+    states: { ramp: { '2026-02-10': approved(), '2026-02-11': approved() } },
+  }
+  const q2 = {
+    grid: { ramp: { '2026-05-10': 'LL', '2026-05-11': '*LL' } },
+    states: { ramp: { '2026-05-10': approved(), '2026-05-11': pending } },
+  }
+
+  it('draws from every war, not just the one being looked at', () => {
+    expect(drawnFrom([q1], 'ramp', 'annual')).toBe(2)
+    expect(drawnFrom([q2], 'ramp', 'annual')).toBe(1.5)
+    expect(drawnFrom([q1, q2], 'ramp', 'annual')).toBe(3.5)
+  })
+
+  it('leaves the balance the same whichever war is open', () => {
+    // 20 opening − 3.5 taken across both = 16.5, and the order of the wars
+    // must not change it.
+    expect(balanceOf(openings, [], [q1, q2], 'ramp', 'annual')).toBe(16.5)
+    expect(balanceOf(openings, [], [q2, q1], 'ramp', 'annual')).toBe(16.5)
+  })
+
+  it('still honours a refusal in a war that is not on screen', () => {
+    const refusedQ2 = {
+      grid: q2.grid,
+      states: { ramp: { '2026-05-10': refused, '2026-05-11': refused } },
+    }
+    expect(drawnFrom([q1, refusedQ2], 'ramp', 'annual')).toBe(2)
+  })
+
+  it('counts nothing from a war the person has no leave in', () => {
+    const empty = { grid: {}, states: {} }
+    expect(drawnFrom([q1, empty], 'ramp', 'annual')).toBe(2)
+    expect(drawnFrom([], 'ramp', 'annual')).toBe(0)
   })
 })

@@ -3,7 +3,8 @@ import { isBiddable } from './bids'
 import { codeOf } from './codes'
 import { evaluateDay } from './evaluate'
 import { balanceOf, COUNTERS } from './counters'
-import { seedGrid, seedLedger, seedOpenings, seedPeople, seedPeriod, seedRequirements, seedStates } from './seed'
+import { overlapping } from './wars'
+import { seedGrid, seedLedger, seedOpenings, seedPeople, seedPeriod, seedRequirements, seedStates, seedWars } from './seed'
 
 describe('seed', () => {
   it('has a roster with all four categories represented', () => {
@@ -205,8 +206,8 @@ describe('seeded balances', () => {
   // figure is positive cannot show that rule working, so the seed has to
   // carry at least one of each sign.
   it('shows a negative balance as well as positive ones, so red renders', () => {
-    const [openings, ledger, grid, states] = [seedOpenings(), seedLedger(), seedGrid(), seedStates()]
-    const all = seedPeople().flatMap(p => COUNTERS.map(c => balanceOf(openings, ledger, grid, states, p.id, c)))
+    const [openings, ledger] = [seedOpenings(), seedLedger()]
+    const all = seedPeople().flatMap(p => COUNTERS.map(c => balanceOf(openings, ledger, seedWars(), p.id, c)))
     expect(all.some(v => v < 0)).toBe(true)
     expect(all.some(v => v > 0)).toBe(true)
   })
@@ -215,5 +216,65 @@ describe('seeded balances', () => {
   // describes; seeding one keeps it from being theoretical.
   it('includes a correction posted as a negative amount', () => {
     expect(seedLedger().some(e => e.amount < 0)).toBe(true)
+  })
+})
+
+describe('seedWars', () => {
+  it('seeds more than one, so switching between them is a real thing to do', () => {
+    expect(seedWars().length).toBeGreaterThan(1)
+  })
+
+  // The next war is normally a draft while its schedule is still being
+  // firmed up. Seeding one open and one draft shows both states at once.
+  it('opens the first and leaves the next in draft', () => {
+    const [q1, q2] = seedWars()
+    expect(q1.period.stage).toBe('open')
+    expect(q2.period.stage).toBe('draft')
+  })
+
+  // A date belongs to at most one war. Two seeded wars sharing a day would
+  // double-count a man in the manning rows and draw his balance twice.
+  it('never seeds two wars that share a day', () => {
+    const wars = seedWars()
+    for (let i = 0; i < wars.length; i++) {
+      for (let j = i + 1; j < wars.length; j++) {
+        if (overlapping(wars[i].period, wars[j].period)) {
+          throw new Error(`seeded wars overlap: ${wars[i].period.id} and ${wars[j].period.id}`)
+        }
+      }
+    }
+    expect(wars.length).toBeGreaterThan(1)
+  })
+
+  it('gives every war a unique id', () => {
+    const ids = seedWars().map(w => w.period.id)
+    expect(new Set(ids).size).toBe(ids.length)
+  })
+
+  // The second war has to hold leave of its own, or the cross-war balance
+  // rule has nothing to prove on first run.
+  it('puts leave in the second war too, drawing the same counters', () => {
+    const [, q2] = seedWars()
+    expect(Object.keys(q2.grid).length).toBeGreaterThan(0)
+    for (const [id, row] of Object.entries(q2.grid)) {
+      for (const date of Object.keys(row)) {
+        if (date < q2.period.start || date > q2.period.end) {
+          throw new Error(`leave outside its war: ${id} ${date}`)
+        }
+      }
+    }
+  })
+
+  it('keeps every seeded cell inside the war that holds it', () => {
+    for (const w of seedWars()) {
+      for (const [id, row] of Object.entries(w.grid)) {
+        for (const date of Object.keys(row)) {
+          if (date < w.period.start || date > w.period.end) {
+            throw new Error(`${w.period.id} holds ${id} ${date}, outside ${w.period.start}..${w.period.end}`)
+          }
+        }
+      }
+    }
+    expect(seedWars().length).toBeGreaterThan(0)
   })
 })

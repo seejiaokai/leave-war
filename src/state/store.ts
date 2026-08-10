@@ -8,19 +8,22 @@ import {
   nextStage,
   raptorOwns,
   COUNTERS,
-  seedGrid,
+  makeWar,
+  overlapping,
   seedLedger,
   seedOpenings,
   seedPeople,
   seedPeriod,
   seedRequirements,
-  seedStates,
+  seedWars,
   STAGE_ORDER,
   type BidRecord,
   type BidSource,
   type BidState,
   type CounterName,
+  type DayInfo,
   type Grid,
+  type LeaveWar,
   type Ledger,
   type Openings,
   type Period,
@@ -34,8 +37,20 @@ import { localBackend, memoryBackend, type StorageBackend } from './storage'
 
 interface State {
   people: Person[]
-  period: Period
   requirements: Requirements
+  /** Every leave war, in the order they were created. Never empty. */
+  wars: LeaveWar[]
+  /** Which one is on screen. */
+  currentId: string
+
+  // ---- derived from `wars` + `currentId`, never assigned directly ----
+  //
+  // The current war's three parts, republished at the top level by
+  // `withCurrent()` on every change. They exist so that the matrix and the
+  // chrome can go on reading `period`, `grid` and `states` exactly as they
+  // did when there was only one war: multiplicity is the store's problem,
+  // not the interface's.
+  period: Period
   grid: Grid
   states: States
   /** Where each counter started. A balance is this plus the ledger less what
@@ -54,19 +69,30 @@ let state: State = blank()
 let version = 0
 const listeners = new Set<() => void>()
 
+/** Republish the current war's parts at the top level. Every assignment to
+ *  `state` goes through this, so the three derived fields cannot fall out of
+ *  step with the war they came from. */
+function withCurrent(s: Omit<State, 'period' | 'grid' | 'states'>): State {
+  // Falling back to the first war rather than throwing: a `currentId`
+  // naming a war that no longer exists is recoverable, and a blank screen
+  // is not. `wars` is never empty — `blank()` seeds it and nothing removes.
+  const war = s.wars.find(w => w.period.id === s.currentId) ?? s.wars[0]
+  return { ...s, period: war.period, grid: war.grid, states: war.states }
+}
+
 function blank(): State {
-  return {
+  const wars = seedWars()
+  return withCurrent({
     people: seedPeople(),
-    period: seedPeriod(),
     requirements: seedRequirements(),
-    grid: seedGrid(),
-    states: seedStates(),
+    wars,
+    currentId: wars[0].period.id,
     openings: seedOpenings(),
     ledger: seedLedger(),
     // The squadron is the common case, so the app opens as one. An admin
     // says so deliberately rather than arriving with the locks already off.
     role: 'member',
-  }
+  })
 }
 
 function isPlainObject(x: unknown): x is Record<string, unknown> {
@@ -180,6 +206,65 @@ function readLedger(x: unknown): Ledger | null {
   return out
 }
 
+// A stored war is its period plus its grid and states. `days` is stored in
+// full rather than rebuilt from start/end, because a day carries events, a
+// blocked flag and its reason — facts the range cannot regenerate and a
+// scheduler would lose on every reload.
+function readWar(x: unknown): LeaveWar | null {
+  if (!isPlainObject(x)) return null
+  const { period, grid, states } = x
+  if (!isPlainObject(period)) return null
+  const { id, name, start, end, stage, days } = period
+  if (typeof id !== 'string' || typeof name !== 'string') return null
+  if (typeof start !== 'string' || typeof end !== 'string' || end < start) return null
+  if (typeof stage !== 'string' || !STAGE_ORDER.includes(stage as Stage)) return null
+  if (!Array.isArray(days)) return null
+
+  const readDays: DayInfo[] = []
+  for (const d of days) {
+    if (!isPlainObject(d)) return null
+    const { date, events, blocked, blockedReason, ph } = d
+    if (typeof date !== 'string') return null
+    if (!Array.isArray(events) || events.length !== 2) return null
+    if (events.some(e => typeof e !== 'string')) return null
+    if (typeof blocked !== 'boolean' || typeof ph !== 'boolean') return null
+    if (typeof blockedReason !== 'string') return null
+    readDays.push({ date, events: [events[0], events[1]], blocked, blockedReason, ph })
+  }
+
+  if (!isValidGrid(grid)) return null
+  const readStatesOrNull = readStates(states)
+  if (!readStatesOrNull) return null
+
+  return {
+    period: { id, name, start, end, stage: stage as Stage, days: readDays },
+    grid,
+    // Same reconciliation the single-war store did: a state whose cell no
+    // longer holds a bid is dropped rather than left to colour it wrong.
+    states: reconcile(grid, readStatesOrNull),
+  }
+}
+
+function readWars(x: unknown): LeaveWar[] | null {
+  if (!Array.isArray(x) || x.length === 0) return null
+  const out: LeaveWar[] = []
+  for (const w of x) {
+    const war = readWar(w)
+    if (!war) return null
+    out.push(war)
+  }
+  // Two wars claiming the same day is the one shape nothing downstream can
+  // resolve — `warHolding` would answer with whichever came first and the
+  // manning counts would double-count the man. Reject the whole blob.
+  for (let i = 0; i < out.length; i++) {
+    for (let j = i + 1; j < out.length; j++) {
+      if (overlapping(out[i].period, out[j].period)) return null
+    }
+  }
+  if (new Set(out.map(w => w.period.id)).size !== out.length) return null
+  return out
+}
+
 /** What the backend holds under `key`, or `null` if there is nothing usable
  *  there. `null` covers both "never written" and "written but unreadable" —
  *  the caller's answer to each is the same, which is to fall back. */
@@ -223,30 +308,48 @@ export function initStore(b?: StorageBackend): void {
   backend = b ?? localBackend()
   state = blank()
 
-  const storedGrid = read('grid', isValidGrid)
-  state.grid = storedGrid ?? seedGrid()
-  // Seed decisions belong to the seed grid and to nothing else. A stored
-  // grid is the squadron's own data, and hanging seeded approvals off it
-  // would approve cells nobody bid for.
-  state.states = reconcile(state.grid, storedGrid ? readStored('states', readStates) ?? {} : seedStates())
+  const wars = readStored('wars', readWars) ?? migrateSingleWar() ?? seedWars()
+  const storedCurrent = backend.read('current')
+  const currentId = wars.some(w => w.period.id === storedCurrent)
+    ? (storedCurrent as string)
+    : wars[0].period.id
 
-  // Asked of STAGE_ORDER rather than compared against a second copy of the
-  // four names, so a stage added to the cycle cannot become one this refuses
-  // to reload. Anything else stored here is not a stage, and the seed's is a
-  // better answer than a period stuck in a state nothing can leave.
-  state.openings = readStored('openings', readOpenings) ?? seedOpenings()
-  state.ledger = readStored('ledger', readLedger) ?? seedLedger()
-
-  const storedStage = backend.read('stage') as Stage | null
-  if (storedStage && STAGE_ORDER.includes(storedStage)) {
-    state.period = { ...state.period, stage: storedStage }
-  }
+  const openings = readStored('openings', readOpenings) ?? seedOpenings()
+  const ledger = readStored('ledger', readLedger) ?? seedLedger()
 
   const storedRole = backend.read('role')
-  if (storedRole === 'member' || storedRole === 'admin') state.role = storedRole
+  const role = storedRole === 'member' || storedRole === 'admin' ? storedRole : state.role
+
+  state = withCurrent({ ...state, wars, currentId, openings, ledger, role })
 
   version = 0
   listeners.clear()
+}
+
+/**
+ * Rebuild one war from the keys written before wars were a list.
+ *
+ * Those browsers hold `grid`, `states` and `stage` and no `wars`, and all of
+ * it belonged to the only period that existed — the seeded one. Rebuilding
+ * rather than discarding follows the same rule as the bid-record migration:
+ * a squadron's real leave is not worth throwing away to save a branch.
+ *
+ * Returns `null` when there is nothing of the old shape to migrate, so a
+ * genuinely fresh boot still falls through to the seed.
+ */
+function migrateSingleWar(): LeaveWar[] | null {
+  const grid = read('grid', isValidGrid)
+  if (!grid) return null
+
+  const period = seedPeriod()
+  const storedStage = backend.read('stage') as Stage | null
+  if (storedStage && STAGE_ORDER.includes(storedStage)) period.stage = storedStage
+
+  return [{
+    period,
+    grid,
+    states: reconcile(grid, readStored('states', readStates) ?? {}),
+  }]
 }
 
 export function getState(): State {
@@ -270,12 +373,21 @@ function notify(): void {
 // One writer for all three keys, so no write path can save a grid and forget
 // the states that have to agree with it.
 function persist(): void {
-  backend.write('grid', JSON.stringify(state.grid))
-  backend.write('states', JSON.stringify(state.states))
-  backend.write('stage', state.period.stage)
+  backend.write('wars', JSON.stringify(state.wars))
+  backend.write('current', state.currentId)
   backend.write('role', state.role)
   backend.write('openings', JSON.stringify(state.openings))
   backend.write('ledger', JSON.stringify(state.ledger))
+}
+
+/** Replace the war on screen, republish the derived fields, save and
+ *  notify. Every write to a cell, a decision or a stage goes through here,
+ *  so none of them can update a war without the interface following. */
+function updateCurrent(fn: (war: LeaveWar) => LeaveWar): void {
+  const wars = state.wars.map((w: LeaveWar) => (w.period.id === state.currentId ? fn(w) : w))
+  state = withCurrent({ ...state, wars })
+  persist()
+  notify()
 }
 
 /** Switch which role the interface is being used as. Unguarded on purpose:
@@ -283,7 +395,7 @@ function persist(): void {
  *  otherwise would be worse than being plain about it. */
 export function setRole(next: Role): void {
   if (next === state.role) return
-  state = { ...state, role: next }
+  state = withCurrent({ ...state, role: next })
   persist()
   notify()
 }
@@ -314,13 +426,11 @@ export function setCell(personId: string, date: string, code: string): void {
   // belonged to the bid that has just been replaced.
   else if (clean !== previous || srow[date] === undefined) srow[date] = { state: 'pending', source: 'bid' }
 
-  state = {
-    ...state,
-    grid: { ...state.grid, [personId]: row },
-    states: { ...state.states, [personId]: srow },
-  }
-  persist()
-  notify()
+  updateCurrent(w => ({
+    ...w,
+    grid: { ...w.grid, [personId]: row },
+    states: { ...w.states, [personId]: srow },
+  }))
 }
 
 /** Record a decision on a bid. Deliberately not role-gated: there is no
@@ -344,9 +454,7 @@ export function setBidState(personId: string, date: string, bid: BidState): void
     ...(state.states[personId] ?? {}),
     [date]: { ...(existing ?? { source: 'bid' as const }), state: bid },
   }
-  state = { ...state, states: { ...state.states, [personId]: srow } }
-  persist()
-  notify()
+  updateCurrent(w => ({ ...w, states: { ...w.states, [personId]: srow } }))
 }
 
 /** Walk the period to its next stage. Forward only, and a no-op at the end
@@ -354,9 +462,7 @@ export function setBidState(personId: string, date: string, bid: BidState): void
 export function advanceStage(): void {
   const next = nextStage(state.period.stage)
   if (!next) return
-  state = { ...state, period: { ...state.period, stage: next } }
-  persist()
-  notify()
+  updateCurrent(w => ({ ...w, period: { ...w.period, stage: next } }))
 }
 
 /** What an inbound Raptor input did here.
@@ -399,13 +505,11 @@ export function ingestFromRaptor(personId: string, date: string, code: string): 
     ...(state.states[personId] ?? {}),
     [date]: { state: 'approved', source: 'raptor' } as BidRecord,
   }
-  state = {
-    ...state,
-    grid: { ...state.grid, [personId]: row },
-    states: { ...state.states, [personId]: srow },
-  }
-  persist()
-  notify()
+  updateCurrent(w => ({
+    ...w,
+    grid: { ...w.grid, [personId]: row },
+    states: { ...w.states, [personId]: srow },
+  }))
   return confirming ? 'confirmed' : 'written'
 }
 
@@ -444,12 +548,55 @@ export function shiftBid(personId: string, from: string, to: string): ShiftResul
   delete srow[from]
   srow[to] = { state: 'pending', source: 'bid', shiftedFrom: from }
 
-  state = {
-    ...state,
-    grid: { ...state.grid, [personId]: row },
-    states: { ...state.states, [personId]: srow },
-  }
+  updateCurrent(w => ({
+    ...w,
+    grid: { ...w.grid, [personId]: row },
+    states: { ...w.states, [personId]: srow },
+  }))
+  return 'shifted'
+}
+
+/** Put a different leave war on screen. Unknown ids are ignored rather than
+ *  blanking the grid — a stale link is not worth an empty page. */
+export function selectWar(id: string): void {
+  if (id === state.currentId) return
+  if (!state.wars.some(w => w.period.id === id)) return
+  state = withCurrent({ ...state, currentId: id })
   persist()
   notify()
-  return 'shifted'
+}
+
+/** Why a war was not created. */
+export type CreateWarResult = 'created' | 'overlap' | 'backwards' | 'unnamed' | 'forbidden'
+
+/**
+ * Create a leave war over any span the admin asks for, down to a single
+ * month. A quarter is the common case, not a rule.
+ *
+ * It lands in DRAFT and does not take the screen: opening it is a separate
+ * act taken when the schedule firms up, and switching to it would yank the
+ * admin out of the war they were working in to look at an empty one.
+ *
+ * The overlap refusal is the load-bearing one. A date must belong to at most
+ * one war, or a person could hold leave on it twice over — the manning
+ * counts would count him away twice and his balance would be drawn twice,
+ * with nothing downstream able to say which war was the real one.
+ */
+export function createWar(name: string, start: string, end: string): CreateWarResult {
+  // Checked here rather than trusted to the hidden button: the role switch
+  // is unguarded, so the store is the only place this can actually mean
+  // anything. See `docs/known-gaps.md`.
+  if (state.role !== 'admin') return 'forbidden'
+
+  const clean = name.trim()
+  if (!clean) return 'unnamed'
+  if (end < start) return 'backwards'
+
+  const war = makeWar(`war-${start}-${end}`, clean, start, end)
+  if (state.wars.some(w => overlapping(w.period, war.period))) return 'overlap'
+
+  state = withCurrent({ ...state, wars: [...state.wars, war] })
+  persist()
+  notify()
+  return 'created'
 }

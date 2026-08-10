@@ -7,6 +7,7 @@ import type { Person } from './people'
 import type { Grid } from './availability'
 import type { States } from './bids'
 import type { Ledger, Openings } from './counters'
+import { makeWar, type LeaveWar } from './wars'
 import type { Requirements } from './requirements'
 
 type Row = [string, Person['seat'], Person['band'], boolean, string | null]
@@ -189,4 +190,42 @@ export function seedLedger(): Ledger {
     // covers top-ups, awards and fixes alike (§Counters).
     { id: 'l6', personId: 'miles', counter: 'annual', amount: -1, date: '2026-02-14', reason: 'Correction: double-counted 12 Jan', approvedBy: 'SQNCDR' },
   ]
+}
+
+// Two leave wars, so switching between them is a real thing to look at on
+// first run rather than a control with one entry.
+//
+// Jan–Mar is OPEN and carries the seeded leave; Apr–Jun is a DRAFT the
+// admin has not opened yet, which is the ordinary state of the next war
+// while the schedule for it is still being firmed up. Apr–Jun holds a
+// little leave of its own precisely so the cross-war balance rule has
+// something to prove: RESET's four days there spend the same annual pool
+// that Jan–Mar draws on, and the figure must not change when you switch.
+//
+// The two do not overlap, and must not: a date belongs to at most one war.
+export function seedWars(): LeaveWar[] {
+  const q1 = makeWar('q1-2026', 'JAN - MAR 26', '2026-01-01', '2026-03-31')
+  q1.period = seedPeriod()
+  q1.grid = seedGrid()
+  q1.states = seedStates()
+
+  const q2 = makeWar('q2-2026', 'APR - JUN 26', '2026-04-01', '2026-06-30')
+  q2.grid = {
+    reset: { '2026-04-13': 'LL', '2026-04-14': 'LL', '2026-04-15': 'LL', '2026-04-16': 'LL' },
+    dusk: { '2026-05-04': 'OIL', '2026-05-05': '*LL' },
+  }
+  q2.states = {
+    reset: {
+      '2026-04-13': { state: 'pending', source: 'bid' },
+      '2026-04-14': { state: 'pending', source: 'bid' },
+      '2026-04-15': { state: 'pending', source: 'bid' },
+      '2026-04-16': { state: 'pending', source: 'bid' },
+    },
+    dusk: {
+      '2026-05-04': { state: 'approved', source: 'raptor' },
+      '2026-05-05': { state: 'pending', source: 'bid' },
+    },
+  }
+
+  return [q1, q2]
 }

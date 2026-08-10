@@ -39,7 +39,7 @@ function monthLabel(date: string): string | null {
 
 export function Matrix() {
   useVersion()
-  const { people, period, grid, states, requirements, role, openings, ledger } = getState()
+  const { people, period, grid, states, requirements, role, openings, ledger, wars } = getState()
   const dates = period.days.map(d => d.date)
   const verdicts = evaluatePeriod(people, grid, states, requirements, dates)
 
@@ -139,9 +139,14 @@ export function Matrix() {
                       has to move the instant a bid is placed, because a
                       pending bid has been asked for and cannot be asked for
                       twice. Negative shows red and is never refused — the
-                      squadron's balances already run negative (§Counters). */}
+                      squadron's balances already run negative (§Counters).
+
+                      Counted across EVERY war, not the one on screen: leave
+                      bid in Jan–Mar still spends annual leave while you are
+                      looking at Apr–Jun, or the same days could be bid twice
+                      over. */}
                   {(() => {
-                    const left = balanceOf(openings, ledger, grid, states, p.id, shown)
+                    const left = balanceOf(openings, ledger, wars, p.id, shown)
                     return (
                       <td
                         className={`bal${left < 0 ? ' neg' : ''}`}

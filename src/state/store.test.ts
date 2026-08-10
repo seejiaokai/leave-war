@@ -7,10 +7,13 @@ import {
   initStore,
   setBidState,
   setCell,
+  createWar,
+  selectWar,
   setRole,
   shiftBid,
   subscribe,
 } from './store'
+import { makeWar } from '../engine'
 import { localBackend, memoryBackend } from './storage'
 
 beforeEach(() => {
@@ -336,13 +339,66 @@ describe('the stored stage', () => {
     expect(getState().period.stage).toBe('open')
   })
 
-  it('reloads every stage the cycle actually has', () => {
+  // Stage now lives INSIDE its war, because each war has its own. The bare
+  // `stage` key survives only as part of the single-war migration below,
+  // which is why these cases now write a grid alongside it.
+  it('reloads every stage the cycle has, through the old single-war shape', () => {
     for (const stage of ['draft', 'open', 'closed', 'published']) {
       const backend = memoryBackend()
+      backend.write('grid', '{"jaguar":{"2026-01-19":"OL"}}')
       backend.write('stage', stage)
       initStore(backend)
       expect(getState().period.stage).toBe(stage)
     }
+  })
+
+  it('reloads each war with its own stage, independently', () => {
+    const backend = memoryBackend()
+    initStore(backend)
+    advanceStage() // the open war -> closed
+    const other = getState().wars.find(w => w.period.id !== getState().currentId)!
+    expect(other.period.stage).toBe('draft')
+    initStore(backend)
+    expect(getState().period.stage).toBe('closed')
+    expect(getState().wars.find(w => w.period.id !== getState().currentId)!.period.stage).toBe('draft')
+  })
+})
+
+describe('upgrading a browser that predates more than one war', () => {
+  // Those browsers hold `grid`, `states` and `stage` and no `wars`, and all
+  // of it belonged to the only period that existed. Rebuilding it as a
+  // single war rather than discarding follows the same rule as the
+  // bid-record migration: a squadron's real leave is not worth throwing away
+  // to save a branch.
+  it('rebuilds one war from the old keys, keeping the leave and the decisions', () => {
+    const backend = memoryBackend()
+    backend.write('grid', '{"jaguar":{"2026-01-19":"OL"}}')
+    backend.write('states', '{"jaguar":{"2026-01-19":{"state":"refused","source":"bid"}}}')
+    backend.write('stage', 'closed')
+    initStore(backend)
+
+    expect(getState().wars).toHaveLength(1)
+    expect(getState().grid.jaguar['2026-01-19']).toBe('OL')
+    expect(getState().states.jaguar['2026-01-19'].state).toBe('refused')
+    expect(getState().period.stage).toBe('closed')
+  })
+
+  it('still seeds both wars on a genuinely fresh boot', () => {
+    initStore(memoryBackend())
+    expect(getState().wars.length).toBeGreaterThan(1)
+  })
+
+  // Once migrated, the next save writes the new shape, so the old keys stop
+  // being consulted. Without this the migration would run on every boot and
+  // quietly discard whatever had happened since.
+  it('writes the new shape on the next save, so it migrates once', () => {
+    const backend = memoryBackend()
+    backend.write('grid', '{"jaguar":{"2026-01-19":"OL"}}')
+    initStore(backend)
+    setCell('jaguar', '2026-01-20', 'LL')
+    initStore(backend)
+    expect(getState().grid.jaguar['2026-01-20']).toBe('LL')
+    expect(getState().wars).toHaveLength(1)
   })
 })
 
@@ -673,5 +729,220 @@ describe('balances in the store', () => {
     expect(getState().ledger).toEqual([
       { id: 'x', personId: 'ramp', counter: 'oil', amount: 2.5, date: '2026-01-01', reason: 'CNY', approvedBy: 'SQNCDR' },
     ])
+  })
+})
+
+describe('more than one leave war', () => {
+  it('boots with the first war on screen', () => {
+    expect(getState().wars.length).toBeGreaterThan(1)
+    expect(getState().currentId).toBe(getState().wars[0].period.id)
+    expect(getState().period.name).toBe('JAN - MAR 26')
+  })
+
+  it('switches to another war, and the grid on screen switches with it', () => {
+    const other = getState().wars[1].period.id
+    selectWar(other)
+    expect(getState().currentId).toBe(other)
+    expect(getState().period.name).toBe('APR - JUN 26')
+    // The Jan–Mar leave is no longer what `grid` answers with.
+    expect(getState().grid.ramp?.['2026-01-01']).toBeUndefined()
+  })
+
+  it('ignores a war that does not exist rather than blanking the screen', () => {
+    const before = getState().currentId
+    selectWar('no-such-war')
+    expect(getState().currentId).toBe(before)
+  })
+
+  it('does not notify when asked to select the war already on screen', () => {
+    const before = getVersion()
+    selectWar(getState().currentId)
+    expect(getVersion()).toBe(before)
+  })
+
+  it('remembers which war was on screen across a reload', () => {
+    const backend = memoryBackend()
+    initStore(backend)
+    selectWar(getState().wars[1].period.id)
+    const chosen = getState().currentId
+    initStore(backend)
+    expect(getState().currentId).toBe(chosen)
+  })
+
+  // Writes land in the war on screen and nowhere else. A cell written while
+  // looking at Apr–Jun must not appear in Jan–Mar.
+  it('writes into the war on screen, leaving the others untouched', () => {
+    const [q1, q2] = getState().wars.map(w => w.period.id)
+    selectWar(q2)
+    setCell('dusk', '2026-04-20', 'LL')
+    expect(getState().grid.dusk['2026-04-20']).toBe('LL')
+    selectWar(q1)
+    expect(getState().grid.dusk?.['2026-04-20']).toBeUndefined()
+  })
+
+  it('advances the stage of the war on screen only', () => {
+    const [q1, q2] = getState().wars.map(w => w.period.id)
+    selectWar(q2)
+    advanceStage() // draft -> open
+    expect(getState().period.stage).toBe('open')
+    selectWar(q1)
+    expect(getState().period.stage).toBe('open') // its own, unchanged
+    advanceStage()
+    expect(getState().period.stage).toBe('closed')
+    selectWar(q2)
+    expect(getState().period.stage).toBe('open')
+  })
+})
+
+describe('creating a leave war', () => {
+  beforeEach(() => {
+    setRole('admin')
+  })
+
+  it('creates one over any span, down to a single month', () => {
+    expect(createWar('JUL 26', '2026-07-01', '2026-07-31')).toBe('created')
+    const made = getState().wars.find(w => w.period.name === 'JUL 26')!
+    expect(made.period.days).toHaveLength(31)
+    expect(made.grid).toEqual({})
+  })
+
+  // A new war starts in draft and is NOT switched to. Creating next
+  // quarter's war should not yank the admin off the one they are working in.
+  it('starts it in draft and leaves the current war on screen', () => {
+    const before = getState().currentId
+    createWar('JUL 26', '2026-07-01', '2026-07-31')
+    expect(getState().currentId).toBe(before)
+    expect(getState().wars.find(w => w.period.name === 'JUL 26')!.period.stage).toBe('draft')
+  })
+
+  // A date belongs to at most one war, or a person could hold leave on it
+  // twice over and the manning counts would count him away twice.
+  it('refuses a span that overlaps a war that already exists', () => {
+    const before = getState().wars.length
+    expect(createWar('CLASH', '2026-03-15', '2026-05-15')).toBe('overlap')
+    expect(getState().wars).toHaveLength(before)
+  })
+
+  it('allows a span that begins the day after another ends', () => {
+    expect(createWar('JUL 26', '2026-07-01', '2026-07-31')).toBe('created')
+  })
+
+  it('refuses a range that ends before it starts', () => {
+    expect(createWar('BACKWARDS', '2026-07-31', '2026-07-01')).toBe('backwards')
+    expect(getState().wars.every(w => w.period.name !== 'BACKWARDS')).toBe(true)
+  })
+
+  it('refuses a war with no name', () => {
+    expect(createWar('   ', '2026-07-01', '2026-07-31')).toBe('unnamed')
+  })
+
+  // Creating a leave war is an admin act. A member has no business making
+  // one, and the store says so rather than relying on the button being
+  // hidden — the switch that hides it is unguarded.
+  it('refuses a member, not just hides the button', () => {
+    setRole('member')
+    expect(createWar('JUL 26', '2026-07-01', '2026-07-31')).toBe('forbidden')
+    expect(getState().wars.every(w => w.period.name !== 'JUL 26')).toBe(true)
+  })
+
+  it('gives every war a distinct id, even for two wars named alike', () => {
+    createWar('JUL 26', '2026-07-01', '2026-07-31')
+    createWar('JUL 26', '2026-08-01', '2026-08-31')
+    const ids = getState().wars.map(w => w.period.id)
+    expect(new Set(ids).size).toBe(ids.length)
+  })
+
+  it('persists a new war across a reload', () => {
+    const backend = memoryBackend()
+    initStore(backend)
+    setRole('admin')
+    createWar('JUL 26', '2026-07-01', '2026-07-31')
+    initStore(backend)
+    expect(getState().wars.some(w => w.period.name === 'JUL 26')).toBe(true)
+  })
+
+  it('does not notify when a creation is refused', () => {
+    const before = getVersion()
+    createWar('CLASH', '2026-03-15', '2026-05-15')
+    expect(getVersion()).toBe(before)
+  })
+})
+
+describe('reading stored wars', () => {
+  const stored = (...wars: unknown[]) => JSON.stringify(wars)
+  const war = (id: string, start: string, end: string) => makeWar(id, id.toUpperCase(), start, end)
+
+  it('keeps a well-formed pair', () => {
+    const backend = memoryBackend()
+    backend.write('wars', stored(war('a', '2026-01-01', '2026-03-31'), war('b', '2026-04-01', '2026-06-30')))
+    initStore(backend)
+    expect(getState().wars.map(w => w.period.id)).toEqual(['a', 'b'])
+  })
+
+  // The one shape nothing downstream can resolve: two wars claiming the same
+  // day. `warHolding` would answer with whichever came first, and a person
+  // could hold leave on that date twice over. Reject the blob entire rather
+  // than pick a winner.
+  it('rejects two wars that share a day, falling back to the seed', () => {
+    const backend = memoryBackend()
+    backend.write('wars', stored(war('a', '2026-01-01', '2026-03-31'), war('b', '2026-03-31', '2026-06-30')))
+    initStore(backend)
+    expect(getState().wars.map(w => w.period.id)).toEqual(['q1-2026', 'q2-2026'])
+  })
+
+  it('rejects two wars sharing an id', () => {
+    const backend = memoryBackend()
+    backend.write('wars', stored(war('a', '2026-01-01', '2026-03-31'), war('a', '2026-04-01', '2026-06-30')))
+    initStore(backend)
+    expect(getState().wars.map(w => w.period.id)).toEqual(['q1-2026', 'q2-2026'])
+  })
+
+  it.each([
+    ['an empty list', '[]'],
+    ['not a list', '{}'],
+    ['a war that is not an object', '["nope"]'],
+  ])('rejects %s, falling back to the seed', (_label, raw) => {
+    const backend = memoryBackend()
+    backend.write('wars', raw)
+    initStore(backend)
+    expect(getState().wars).toHaveLength(2)
+    expect(getState().period.name).toBe('JAN - MAR 26')
+  })
+
+  it('rejects a war whose stage is not one of the cycle', () => {
+    const backend = memoryBackend()
+    const w = war('a', '2026-01-01', '2026-03-31') as unknown as { period: Record<string, unknown> }
+    w.period.stage = 'reopened'
+    backend.write('wars', stored(w))
+    initStore(backend)
+    expect(getState().period.name).toBe('JAN - MAR 26')
+  })
+
+  it('rejects a war whose range runs backwards', () => {
+    const backend = memoryBackend()
+    const w = war('a', '2026-01-01', '2026-03-31') as unknown as { period: Record<string, unknown> }
+    w.period.end = '2025-12-01'
+    backend.write('wars', stored(w))
+    initStore(backend)
+    expect(getState().period.name).toBe('JAN - MAR 26')
+  })
+
+  // A day carries events, a blocked flag and its reason — facts the date
+  // range cannot regenerate. They are stored in full and must survive, or a
+  // scheduler loses their exercise week on every reload.
+  it('keeps each day’s events, blocked flag and reason', () => {
+    const backend = memoryBackend()
+    initStore(backend)
+    // A WRITE is what saves. Without one, `initStore` twice over just seeds
+    // twice and never round-trips through storage at all — which is how the
+    // first draft of this test passed against a loader that discarded every
+    // day.
+    setCell('ramp', '2026-01-20', 'LL')
+    initStore(backend)
+    expect(getState().grid.ramp['2026-01-20']).toBe('LL')
+    const blocked = getState().period.days.find(d => d.date === '2026-03-10')!
+    expect(blocked.blocked).toBe(true)
+    expect(blocked.blockedReason).toBe('Exercise week')
+    expect(getState().period.days.find(d => d.date === '2026-01-01')!.ph).toBe(true)
   })
 })
