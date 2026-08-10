@@ -661,6 +661,35 @@ export function clearBidWindow(): BidWindowResult {
   return 'set'
 }
 
+/**
+ * Write one of a day's two event lines.
+ *
+ * Admin-only: these are the scheduler's facts about a day — an exercise, a
+ * visit, a range closure — not something a bidder writes about themselves.
+ * Checked in the store for the same reason every other write is: the role
+ * switch is an affordance, so this is the only place it can bite.
+ *
+ * Days are stored in full rather than rebuilt from the period's range
+ * precisely so these survive a reload; see `readWar`.
+ */
+export function setDayEvent(date: string, line: 0 | 1, text: string): boolean {
+  if (state.role !== 'admin') return false
+  if (!state.period.days.some(d => d.date === date)) return false
+  updateCurrent(w => ({
+    ...w,
+    period: {
+      ...w.period,
+      days: w.period.days.map(d => {
+        if (d.date !== date) return d
+        const events: [string, string] = [d.events[0], d.events[1]]
+        events[line] = text
+        return { ...d, events }
+      }),
+    },
+  }))
+  return true
+}
+
 /** Walk the period to its next stage. Forward only, and a no-op at the end
  *  of the cycle — `nextStage` owns which transitions exist. */
 export function advanceStage(): void {

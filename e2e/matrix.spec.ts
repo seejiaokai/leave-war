@@ -184,7 +184,11 @@ test('the matrix stays within a sane DOM size', async ({ page }) => {
   // 296-355ms. That cost was measured first and the year adopted second;
   // had it come out at seconds, the year would not have shipped.
   //
-  // Raised again, 9600 -> 9900, when every date header gained a weekday
+  // Raised a third time, 9900 -> 10700, for the two event rows: 730 more
+  // cells, and 730 inputs on top of that when an admin is looking. Measured
+  // 10350 as a member and 10367 with a sheet open.
+  //
+  // Raised before that, 9600 -> 9900, when every date header gained a weekday
   // label. That is 365 more spans and takes the measured figure to 9607, and
   // it is worth the nodes: a year of columns numbered 01…31 twelve times
   // over gives the eye nothing to hold on to.
@@ -198,7 +202,7 @@ test('the matrix stays within a sane DOM size', async ({ page }) => {
   // grid that quietly went back to a quarter would sit near 2357 and this
   // would catch it.
   expect(nodes).toBeGreaterThan(8000)
-  expect(nodes).toBeLessThan(9900)
+  expect(nodes).toBeLessThan(10700)
 
   await page.locator('[data-testid="cell-dusk-2026-02-11"]').click()
   await expect(page.locator('[data-testid="bid-picker"]')).toBeVisible()
@@ -209,7 +213,7 @@ test('the matrix stays within a sane DOM size', async ({ page }) => {
   // it is the sheet's unbounded growth this half of the test watches.
   const all = await page.evaluate(() => document.querySelectorAll('*').length)
   expect(all).toBeGreaterThan(nodes)
-  expect(all).toBeLessThan(10000)
+  expect(all).toBeLessThan(10800)
 })
 
 // A year is ~13,600px of grid. Reaching September by dragging is not a thing
@@ -956,4 +960,44 @@ test('the SXO tag is not clipped in the callsign column on a phone', async ({ pa
   }))
   expect(cut.text).toContain('OPSP(S)')
   expect(cut.over).toBe(false)
+})
+
+// The owner's rule for the event lines: "If the text needs more space, that
+// day will widen to accommodate the info until a certain point then it will
+// wrap text and grow vertically on that grid only." Three behaviours, none of
+// which jsdom can see — it computes no layout at all.
+test('an event widens its day, then wraps and grows only its own rows', async ({ page }) => {
+  await page.locator('[data-testid="role-toggle"]').click()
+
+  const col = (d: string) => page.locator(`[data-testid="head-${d}"]`).boundingBox()
+  const personRow = () => page.locator('[data-testid="row-ramp"]').boundingBox()
+  const eventRow = () => page.locator('[data-testid="event-row-0"]').boundingBox()
+
+  const narrow = (await col('2026-01-05'))!
+  const rowBefore = (await personRow())!
+  const eventBefore = (await eventRow())!
+
+  // 1. A SHORT event widens the column.
+  await page.locator('[data-testid="event-in-0-2026-01-05"]').fill('CO visit')
+  const widened = (await col('2026-01-05'))!
+  expect(widened.width).toBeGreaterThan(narrow.width)
+
+  // 2. A LONG one stops widening at the ceiling and wraps instead.
+  await page.locator('[data-testid="event-in-0-2026-01-05"]')
+    .fill('Range closure 0900-1400, live firing on the eastern ranges, all crews briefed')
+  const capped = (await col('2026-01-05'))!
+  expect(capped.width).toBeLessThanOrEqual(140)
+  const eventAfter = (await eventRow())!
+  expect(eventAfter.height).toBeGreaterThan(eventBefore.height)
+
+  // 3. ...and ONLY the event rows grew. Every person's row keeps its height,
+  // which is what "on that grid only" has to mean if a year is to stay
+  // readable with an event on it.
+  const rowAfter = (await personRow())!
+  expect(Math.abs(rowAfter.height - rowBefore.height)).toBeLessThan(2)
+})
+
+test('a member reads the events and cannot type into them', async ({ page }) => {
+  await expect(page.locator('[data-testid="event-0-2026-01-01"]')).toHaveText('PH')
+  await expect(page.locator('[data-testid="event-in-0-2026-01-01"]')).toHaveCount(0)
 })

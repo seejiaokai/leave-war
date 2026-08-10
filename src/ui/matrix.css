@@ -505,3 +505,78 @@
 .mx .who .whoedit:hover {
   color: var(--accent);
 }
+
+/* ---- the two event rows ----
+
+   The owner's rule, 10 Aug 26: "If the text needs more space, that day will
+   widen to accommodate the info until a certain point then it will wrap text
+   and grow vertically on that grid only."
+
+   That is three behaviours in one sentence, and CSS gives them in one place.
+   `.mx` is `white-space: nowrap` throughout, so a day column already widens
+   to fit whatever is in it — the missing half is the CEILING. `max-width`
+   on the event cell is the "certain point"; past it `white-space: normal`
+   takes over and the text wraps instead, which grows the row rather than the
+   year. And because a table row is as tall as its tallest cell, only the two
+   event rows grow — every person's row keeps its height, which is what
+   "on that grid only" has to mean if the year is to stay readable.
+
+   130px is the ceiling: about three columns' worth, wide enough for "Range
+   closure 0900-1400" and narrow enough that one busy day cannot push
+   September off the far end of the grid. */
+.mx .events td.ev {
+  max-width: 130px;
+  white-space: normal;
+  vertical-align: top;
+  font-size: 9.5px;
+  line-height: 1.25;
+  color: var(--ink-3);
+  text-align: left;
+  padding: 2px 4px;
+}
+
+/* A day that HAS an event reads as one at a glance, before anybody reads the
+   words. The tint is the same accent every informational surface here uses,
+   at the lowest strength that survives on the panel. */
+.mx .events td.ev.has {
+  background: rgba(59, 198, 232, .07);
+  color: var(--ink-2);
+}
+
+.mx .events .who {
+  font-size: 9.5px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  background: var(--panel);
+}
+
+.mx .events td.bal {
+  background: var(--panel);
+}
+
+/* The input fills its cell and paints nothing of its own — a box around every
+   day of a year would be 730 boxes, and the cell it sits in is already a box.
+   It comes forward on focus, which is the one moment it needs an edge. */
+.mx .events .evin {
+  width: 100%;
+  min-width: 26px;
+  background: none;
+  border: none;
+  color: inherit;
+  font: inherit;
+  font-family: inherit;
+  padding: 0;
+  /* A textarea, so: no drag handle (the column decides its own width), no
+     scrollbar (its `rows` already match its content), and wrapping on. */
+  resize: none;
+  overflow: hidden;
+  display: block;
+  line-height: 1.25;
+}
+
+.mx .events .evin:focus {
+  outline: 1px solid rgba(59, 198, 232, .55);
+  outline-offset: 1px;
+  color: var(--ink);
+}

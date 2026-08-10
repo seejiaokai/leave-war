@@ -24,6 +24,7 @@ import { BidPicker, DecisionSheet, RaptorSheet } from './BidPicker'
 import { CounterSheet } from './CounterSheet'
 import { PersonSheet } from './PersonSheet'
 import { CountRows } from './CountRows'
+import { EventRows } from './EventRows'
 import { useVersion } from './useStore'
 import './matrix.css'
 
@@ -220,6 +221,10 @@ export function Matrix() {
                 })}
               </tr>
             </thead>
+            {/* Above the counts, because an event is the REASON a day is
+                thin — reading the cause before the effect is the order a
+                scheduler works in. */}
+            <EventRows days={period.days} editable={role === 'admin'} />
             <CountRows verdicts={verdicts} dates={dates} />
             <tbody>
               {people.map(p => (
