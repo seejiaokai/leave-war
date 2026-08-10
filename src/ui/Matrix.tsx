@@ -25,6 +25,7 @@ import { CounterSheet } from './CounterSheet'
 import { PersonSheet } from './PersonSheet'
 import { CountRows } from './CountRows'
 import { EventRows } from './EventRows'
+import { monthInView } from './monthview'
 import { useVersion } from './useStore'
 import './matrix.css'
 
@@ -91,20 +92,67 @@ export function Matrix() {
   const wrapRef = useRef<HTMLDivElement>(null)
   const months = monthsIn(period.start, period.end)
 
+  // Measured live rather than read off the CSS custom properties: the two
+  // frozen columns change width at the phone breakpoint, and a hard-coded
+  // offset would be wrong on one of the two devices. Shared by the jump and
+  // by the in-view readout, which both need to know where the day columns
+  // actually begin.
+  const frozenWidth = (wrap: HTMLElement): number =>
+    ['.who', '.bal']
+      .map(sel => wrap.querySelector<HTMLElement>(sel)?.getBoundingClientRect().width ?? 0)
+      .reduce((a, b) => a + b, 0)
+
   const jumpTo = (date: string) => {
     const wrap = wrapRef.current
     const cell = wrap?.querySelector<HTMLElement>(`[data-testid="head-${date}"]`)
     if (!wrap || !cell) return
-    // Measured live rather than read off the CSS custom properties: the two
-    // frozen columns change width at the phone breakpoint, and a hard-coded
-    // offset would land the target underneath them on one device and not
-    // the other. Scrolling BY a delta rather than TO an absolute keeps this
-    // correct wherever the grid happens to be scrolled already.
-    const frozen = ['.who', '.bal']
-      .map(sel => wrap.querySelector<HTMLElement>(sel)?.getBoundingClientRect().width ?? 0)
-      .reduce((a, b) => a + b, 0)
-    wrap.scrollLeft += cell.getBoundingClientRect().left - wrap.getBoundingClientRect().left - frozen
+    // Scrolling BY a delta rather than TO an absolute keeps this correct
+    // wherever the grid happens to be scrolled already.
+    wrap.scrollLeft += cell.getBoundingClientRect().left - wrap.getBoundingClientRect().left - frozenWidth(wrap)
   }
+
+  // Which month the grid is showing, so the strip says where you ARE and not
+  // only where you can go. Held as state rather than derived during render
+  // because it is a fact about scroll position, which no render sees.
+  const [inView, setInView] = useState<string | null>(null)
+
+  const measureInView = () => {
+    const wrap = wrapRef.current
+    if (!wrap || months.length === 0 || dates.length === 0) return
+    const headLeft = (date: string) =>
+      wrap.querySelector<HTMLElement>(`[data-testid="head-${date}"]`)?.getBoundingClientRect().left
+    const lastHead = wrap.querySelector<HTMLElement>(`[data-testid="head-${dates[dates.length - 1]}"]`)
+    if (!lastHead) return
+
+    // One rect per month plus the last column, not one per day: thirteen
+    // reads on a year rather than 365, which is what makes measuring this on
+    // every scroll event affordable.
+    const edges = months.map(m => headLeft(m.first))
+    if (edges.some(e => e === undefined)) return
+    const end = lastHead.getBoundingClientRect().right
+    const spans = months.map((m, i) => ({
+      label: m.label,
+      left: edges[i]!,
+      // A month runs up to where the next one starts; the last runs to the
+      // right edge of the final column.
+      right: i + 1 < edges.length ? edges[i + 1]! : end,
+    }))
+
+    const wr = wrap.getBoundingClientRect()
+    // The visible strip starts where the day columns do — the frozen columns
+    // sit ON TOP of them, so counting from the wrapper's own left edge would
+    // credit whichever month is hidden underneath the callsigns.
+    setInView(monthInView(spans, wr.left + frozenWidth(wrap), wr.right))
+  }
+
+  // Measured synchronously on scroll rather than deferred to a frame: thirteen
+  // rectangle reads is small beside what scrolling a 9,200-node table already
+  // costs, and a deferred reading is a reading of where the grid used to be.
+  // Re-measured when the war changes too, since that rebuilds every column.
+  useEffect(() => {
+    measureInView()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [period.id, dates.length])
 
   // The under-manned list asks for a day the same way the month strip asks
   // for a month, through the one `jumpTo` above — so a target lands clear of
@@ -157,8 +205,9 @@ export function Matrix() {
             {months.map(m => (
               <button
                 key={m.first}
-                className="mjump"
+                className={`mjump${m.label === inView ? ' on' : ''}`}
                 data-testid={`month-${m.label.replace(' ', '-')}`}
+                aria-current={m.label === inView ? 'true' : undefined}
                 title={`Jump to ${m.label}`}
                 onClick={() => jumpTo(m.first)}
               >
@@ -170,6 +219,7 @@ export function Matrix() {
         <div
           className="mx-wrap"
           ref={wrapRef}
+          onScroll={measureInView}
           onTouchStart={onTouchStart}
           onTouchEnd={onTouchEnd}
         >

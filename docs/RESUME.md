@@ -6,7 +6,7 @@ where the work stopped and what comes next, so a session picking it up cold does
 not have to reconstruct it from `git log`.
 
 **State as of 10 Aug 26, after the owner's phone review and a second round of
-their notes.** 562 unit tests, 115 Playwright runs across a phone and a
+their notes.** 571 unit tests, 125 Playwright runs across a phone and a
 desktop project, clean build, all verified first-hand. Work continues on
 `claude/bidding-plan-continuation-vqnrfz`, and **`main` is merged up to it** —
 see the merge agreement in `CLAUDE.md`.
@@ -102,6 +102,15 @@ near-white. The dropped-open option list mattered more than the closed chip —
 a native `<option>` inherits the select's colours, so it was several rows of
 green on green with no border to break them up, and it now takes the neutral
 panel colours instead.
+
+**The month strip says where you are, not only where you can go** (owner,
+10 Aug 26). The month filling the grid is lit in the accent, and it follows a
+real scroll as well as a jump. "Filling" means most of the visible width, not
+whichever month the left edge lands in — three days of February beside four
+weeks of March is a March screen — and a tie holds the earlier month so the
+label cannot flicker while the grid is dragged across a boundary. The
+arithmetic is a pure function (`src/ui/monthview.ts`) because the measuring
+half cannot be tested: jsdom reports every rectangle as 0×0.
 
 **The under-manned tally opens the days that caused it.** It was a dead end:
 it said seven days were broken and left a scheduler to find them across 365
@@ -286,8 +295,8 @@ Both are in `docs/known-gaps.md` with the reasoning:
 ```
 npm install
 npm run dev                 # or: npm run build && npx vite preview --port 4173
-npx vitest run              # 562 tests
-npm run test:e2e            # 115 runs, phone and desktop (3 touch-only skips)
+npx vitest run              # 571 tests
+npm run test:e2e            # 125 runs, phone and desktop (3 touch-only skips)
 npm run build               # typecheck + production build
 ```
 

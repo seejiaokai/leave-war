@@ -486,6 +486,19 @@
   color: var(--accent);
 }
 
+/* The month the grid is actually showing. The accent, matching Raptor's own
+   `.fchip.on` — this is the same idea as a selected filter chip, so it must
+   not invent a second visual language for "this one".
+   Declared AFTER `:hover` so the month you are on keeps its fill while the
+   pointer is over a different button: both rules are specificity (0,2,0), so
+   the later one wins where they collide, and the reading must not change
+   under the cursor. */
+.mjump.on {
+  background: rgba(59, 198, 232, .16);
+  border-color: rgba(59, 198, 232, .6);
+  color: var(--accent);
+}
+
 /* The callsign as a control, for an admin. Inherits the cell's own type and
    colour rather than styling itself, so the row reads identically whether it
    is editable or not — a member and an admin must see the same roster, not

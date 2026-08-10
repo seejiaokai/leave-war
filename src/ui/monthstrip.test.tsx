@@ -94,3 +94,77 @@ describe('the month strip', () => {
     expect(phone - desktop).toBe(42)
   })
 })
+
+/** State a whole year's worth of month rectangles, as if each month were 300
+ *  wide and the grid scrolled left by `offset`. Same trick as `fakeLayout`
+ *  and the same caveat: this proves which month the ARITHMETIC picks out of
+ *  stated geometry, never that a browser lays the year out this way.
+ *  `monthview.test.ts` proves the arithmetic itself; the browser gate proves
+ *  the real measurement follows a real scroll. */
+function layoutYear(offset: number) {
+  const wrap = document.querySelector<HTMLElement>('.mx-wrap')!
+  const rect = (left: number, width: number) => () => ({
+    left, width, right: left + width, x: left, top: 0, bottom: 0, y: 0, height: 0, toJSON: () => '',
+  }) as unknown as DOMRect
+
+  // Viewport 0..800, with 162px of frozen columns on top of the left edge,
+  // so the day columns are visible through 162..800.
+  wrap.getBoundingClientRect = rect(0, 800)
+  wrap.querySelector<HTMLElement>('.who')!.getBoundingClientRect = rect(0, 118)
+  wrap.querySelector<HTMLElement>('.bal')!.getBoundingClientRect = rect(118, 44)
+
+  const firsts = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12']
+  firsts.forEach((mm, i) => {
+    screen.getByTestId(`head-2026-${mm}-01`).getBoundingClientRect = rect(i * 300 - offset, 41)
+  })
+  screen.getByTestId('head-2026-12-31').getBoundingClientRect = rect(3600 - offset - 41, 41)
+
+  fireEvent.scroll(wrap)
+}
+
+const lit = () =>
+  [...screen.getByTestId('month-strip').querySelectorAll('button')]
+    .filter(b => b.className.includes('on'))
+    .map(b => b.textContent)
+
+describe('the month strip says which month is on screen', () => {
+  it('lights the month filling the view, and only that one', () => {
+    render(<Matrix />)
+    // Visible 162..800. JAN 0..300 gives 138; FEB 300..600 gives 300.
+    act(() => layoutYear(0))
+    expect(lit()).toEqual(['FEB'])
+  })
+
+  it('follows the grid as it scrolls', () => {
+    render(<Matrix />)
+    act(() => layoutYear(0))
+    expect(lit()).toEqual(['FEB'])
+    // At 1800 the months sit JUL 0..300, AUG 300..600, SEP 600..900. Against
+    // the visible 162..800 that is 138 of JUL, all 300 of AUG, 200 of SEP —
+    // so AUG. (The first draft of this test said JUL, having read the month
+    // at the left edge rather than the one filling the screen. The code was
+    // right and the expectation was wrong.)
+    act(() => layoutYear(1800))
+    expect(lit()).toEqual(['AUG'])
+    // At 3000: NOV 0..300 gives 138, DEC 300..600 gives its whole width.
+    act(() => layoutYear(3000))
+    expect(lit()).toEqual(['DEC'])
+  })
+
+  // The whole point of subtracting the frozen columns. With them ignored the
+  // view would start at 0 and JANUARY would keep the highlight while the
+  // squadron is plainly looking at February.
+  it('ignores the months hidden underneath the frozen columns', () => {
+    render(<Matrix />)
+    // JAN occupies 0..300 but only 162..300 of it is actually visible.
+    act(() => layoutYear(0))
+    expect(lit()).not.toContain('JAN')
+  })
+
+  it('lights nothing before anything has been measured', () => {
+    render(<Matrix />)
+    // jsdom reports every rectangle as zero, so the view has no width and
+    // there is no honest answer to give.
+    expect(lit()).toEqual([])
+  })
+})

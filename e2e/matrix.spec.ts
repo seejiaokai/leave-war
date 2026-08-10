@@ -1105,3 +1105,78 @@ test('the under-manned list stays on screen and its rows are reachable', async (
   await page.locator('[data-testid="undermanned-day-2026-01-05"]').click()
   await expect(page.locator('[data-testid="undermanned-list"]')).toHaveCount(0)
 })
+
+// ---- the month strip says where you are (owner, 10 Aug 26) ---------------
+// jsdom computes no layout, so the unit suite proves the arithmetic against
+// stated rectangles and nothing about what a real year measures to. Only here
+// can a real scroll be followed by a real reading.
+
+/** Which month buttons are lit, in strip order. */
+async function litMonths(page: import('@playwright/test').Page) {
+  return page.$$eval('[data-testid="month-strip"] button.on', bs => bs.map(b => b.textContent))
+}
+
+test('the strip lights the month the grid is showing, and only one', async ({ page }) => {
+  await expect.poll(() => litMonths(page)).toEqual(['JAN'])
+})
+
+test('the lit month follows a real scroll', async ({ page }) => {
+  const wrap = page.locator('.mx-wrap')
+  const settle = async () => {
+    await page.waitForFunction(() => {
+      const el = document.querySelector('.mx-wrap') as HTMLElement
+      const w = window as unknown as { __l?: number; __n?: number }
+      if (el.scrollLeft === w.__l) w.__n = (w.__n ?? 0) + 1
+      else { w.__n = 0; w.__l = el.scrollLeft }
+      return (w.__n ?? 0) >= 3
+    }, undefined, { polling: 'raf', timeout: 5000 })
+  }
+
+  // Jumping is the fastest honest way to move a long distance, and it is the
+  // control the strip belongs to: pressing SEP must leave SEP lit.
+  await page.locator('[data-testid="month-SEP"]').click()
+  await settle()
+  expect(await litMonths(page)).toEqual(['SEP'])
+
+  // And a plain drag of the scroller, which no button was involved in.
+  await wrap.evaluate(el => el.scrollTo({ left: 0, behavior: 'instant' as ScrollBehavior }))
+  await settle()
+  expect(await litMonths(page)).toEqual(['JAN'])
+})
+
+test('every month in the strip can be reached and lights itself', async ({ page }) => {
+  // Walked rather than sampled: a reading that worked for one month and not
+  // for the boundary months would be worth knowing about, and December is the
+  // one whose right edge is computed differently from all the others.
+  for (const m of ['MAR', 'JUN', 'DEC']) {
+    await page.locator(`[data-testid="month-${m}"]`).click()
+    await expect.poll(() => litMonths(page), { timeout: 5000 }).toEqual([m])
+  }
+})
+
+test('the lit month is painted, not merely classed', async ({ page }) => {
+  const lit = page.locator('[data-testid="month-strip"] button.on').first()
+  const plain = page.locator('[data-testid="month-JUN"]')
+  const bg = (l: typeof lit) => l.evaluate(el => getComputedStyle(el).backgroundColor)
+  expect(await bg(lit)).not.toBe(await bg(plain))
+  // Blue, as asked for: the accent channel has to dominate.
+  const [r, g, b] = (await lit.evaluate(el => getComputedStyle(el).color)).match(/\d+/g)!.map(Number)
+  expect(b).toBeGreaterThan(r)
+  expect(g).toBeGreaterThan(r)
+})
+
+// Measuring on every scroll event is only affordable because it reads
+// thirteen rectangles rather than 365. If that ever regresses to a per-day
+// walk this is what notices.
+test('scrolling the year stays responsive with the readout attached', async ({ page }) => {
+  const ms = await page.evaluate(() => {
+    const el = document.querySelector('.mx-wrap') as HTMLElement
+    const t0 = performance.now()
+    for (let i = 0; i < 40; i++) {
+      el.scrollLeft = i * 300
+      el.dispatchEvent(new Event('scroll'))
+    }
+    return performance.now() - t0
+  })
+  expect(ms).toBeLessThan(2000)
+})
