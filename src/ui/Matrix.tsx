@@ -10,6 +10,7 @@ import {
   isDuty,
   COUNTERS,
   counterLabel,
+  dayName,
   isWeekend,
   monthsIn,
   parseCell,
@@ -166,6 +167,14 @@ export function Matrix() {
                         .join(' — ')}
                     >
                       {mon && <span className="mon">{mon}</span>}
+                      {/* The day of the week, on every column. A year of
+                          columns numbered 01…31 twelve times over gives the
+                          eye nothing to hold on to: the weekend banding says
+                          where a week ENDS but not which day any given
+                          column is, and "which Tuesday" is the question
+                          somebody bidding actually asks. Owner's request,
+                          10 Aug 26. */}
+                      <span className="dow">{dayName(d.date)}</span>
                       {d.date.slice(8)}
                     </th>
                   )

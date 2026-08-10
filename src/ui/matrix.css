@@ -1,9 +1,13 @@
 /* The matrix — Raptor's chip-and-card idiom. The .card/.stage wrapper this
    table sits inside lives in chrome.css. */
 
+/* 86vh, raised from 74vh on 10 Aug 26. The topbar no longer sticks, so once
+   the chrome is out of the way the grid should be able to fill what is left —
+   at 74vh it stopped short of the bottom and the page simply ended in empty
+   space. The remaining 14% is the card's own padding and the month strip. */
 .mx-wrap {
   overflow: auto;
-  max-height: 74vh;
+  max-height: 86vh;
   -webkit-overflow-scrolling: touch;
 }
 
@@ -128,6 +132,23 @@
 .mx thead th.who {
   z-index: 3;
   background: var(--panel-2);
+}
+
+/* The weekday, on its own line above the date. Quieter than both the month
+   label and the number — it is an aid to finding a column, not something
+   anybody reads a row of.
+
+   `display: block` is load-bearing, not tidiness: without it the weekday and
+   the date run together as "SAT03", which reads as one long token and widens
+   every column in the year to fit it. Seen happening in a screenshot at
+   390px before it was caught. */
+.mx thead th .dow {
+  display: block;
+  font-size: 8px;
+  font-weight: 600;
+  letter-spacing: .06em;
+  color: var(--ink-3);
+  opacity: .8;
 }
 
 .mx thead th .mon {

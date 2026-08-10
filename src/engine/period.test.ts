@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { addDays, buildDays, isWeekend } from './period'
+import { addDays, buildDays, dayName, isWeekend } from './period'
 
 describe('isWeekend', () => {
   it('recognises Saturday and Sunday', () => {
@@ -57,5 +57,38 @@ describe('buildDays', () => {
 
   it('returns nothing when the end precedes the start', () => {
     expect(buildDays('2026-01-05', '2026-01-01')).toEqual([])
+  })
+})
+
+describe('dayName', () => {
+  it('names each day of a known week', () => {
+    // 2026-01-05 is a Monday.
+    expect(['2026-01-05', '2026-01-06', '2026-01-07', '2026-01-08', '2026-01-09', '2026-01-10', '2026-01-11']
+      .map(dayName)).toEqual(['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'])
+  })
+
+  // The same UTC discipline as `isWeekend`, and for the same reason: a
+  // local-time accessor names the wrong day for anyone east or west of UTC,
+  // which would put MON over a Sunday column for half the squadron.
+  it('names the same day in every timezone', () => {
+    const original = process.env.TZ
+    try {
+      for (const tz of ['UTC', 'Pacific/Kiritimati', 'Pacific/Midway', 'Asia/Singapore']) {
+        process.env.TZ = tz
+        expect(dayName('2026-01-05')).toBe('MON')
+        expect(dayName('2026-01-11')).toBe('SUN')
+      }
+    } finally {
+      process.env.TZ = original
+    }
+  })
+
+  // The weekend banding and the weekday label must never disagree — they are
+  // two readings of one fact, and a column labelled SAT without the band (or
+  // the reverse) would be worse than either alone.
+  it('agrees with isWeekend on every day of a year', () => {
+    for (const d of buildDays('2026-01-01', '2026-12-31')) {
+      expect(isWeekend(d.date)).toBe(dayName(d.date) === 'SAT' || dayName(d.date) === 'SUN')
+    }
   })
 })

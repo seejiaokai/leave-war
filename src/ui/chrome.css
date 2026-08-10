@@ -2,9 +2,19 @@
    from Raptor's scheduler.css (.topbar, .mark, .nav, .wk, .filters, .fchip)
    verbatim, not from the comp's slightly different re-derivation of them. */
 
+/* NOT sticky, deliberately, and it used to be.
+   The owner, from a phone, 10 Aug 26: "can u allow me to scroll away the top
+   bar with the leave war title etc. so that I have more space to view the
+   grid." Measured at 390x760 before the change: the title, the war picker,
+   the stage strip and the month strip together held 690px of a 760px screen
+   and left four rows of grid visible. A sticky topbar would have kept the
+   worst of that on screen permanently.
+
+   The date header inside `.mx-wrap` is still sticky, so scrolling the chrome
+   away costs nothing — the row of dates a person is reading against stays
+   put, which is the only part of the top of this page that was ever
+   load-bearing while scrolling. */
 .topbar {
-  position: sticky;
-  top: 0;
   z-index: 60;
   display: flex;
   align-items: center;
@@ -102,6 +112,7 @@
   display: flex;
   gap: 6px;
   padding: 8px 20px;
+  row-gap: 6px;
   flex-wrap: wrap;
   align-items: center;
   border-bottom: 1px solid var(--edge);
@@ -272,4 +283,57 @@
 
 .winchip:disabled {
   cursor: default;
+}
+
+/* ---- phone: give the grid the screen ----
+
+   Same breakpoint as the matrix's own, and last in this file for the same
+   cascade reason that block is last in its own — see the note there.
+
+   The owner's complaint was that the chrome ate the screen. Making the
+   topbar scroll away is half the answer; the other half is that there is
+   less of it to scroll past. Everything here is a size reduction, not a
+   removal: nothing on the strip is decoration, and hiding a control to save
+   a row would only move the problem. */
+@media (max-width: 430px) {
+  .topbar {
+    gap: 8px;
+    padding: 8px 12px;
+  }
+
+  .mark .v {
+    font-size: 15px;
+    letter-spacing: .16em;
+  }
+
+  /* The nav is a single non-link reading "Leave war" — the app's one page.
+     It is the only thing here that says nothing a phone user needs, and it
+     costs a whole row beside the title. */
+  .nav {
+    display: none;
+  }
+
+  .filters {
+    gap: 4px;
+    row-gap: 4px;
+    padding: 6px 12px;
+  }
+
+  .filters .lab {
+    font-size: 9px;
+    letter-spacing: .1em;
+    margin-right: 0;
+  }
+
+  .fchip,
+  .stage-go,
+  .rchip {
+    padding: 4px 8px;
+    font-size: 11px;
+    min-width: 0;
+  }
+
+  .stage {
+    padding: 8px 10px 20px;
+  }
 }

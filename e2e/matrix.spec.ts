@@ -164,6 +164,11 @@ test('the matrix stays within a sane DOM size', async ({ page }) => {
   // 296-355ms. That cost was measured first and the year adopted second;
   // had it come out at seconds, the year would not have shipped.
   //
+  // Raised again, 9600 -> 9900, when every date header gained a weekday
+  // label. That is 365 more spans and takes the measured figure to 9607, and
+  // it is worth the nodes: a year of columns numbered 01…31 twelve times
+  // over gives the eye nothing to hold on to.
+  //
   // The headroom principle is unchanged: this is a ceiling, not a target,
   // and raising it is a deliberate edit in the change that adds the nodes.
   const nodes = await page.evaluate(() => document.querySelectorAll('.mx *').length)
@@ -173,17 +178,18 @@ test('the matrix stays within a sane DOM size', async ({ page }) => {
   // grid that quietly went back to a quarter would sit near 2357 and this
   // would catch it.
   expect(nodes).toBeGreaterThan(8000)
-  expect(nodes).toBeLessThan(9600)
+  expect(nodes).toBeLessThan(9900)
 
   await page.locator('[data-testid="cell-dusk-2026-02-11"]').click()
   await expect(page.locator('[data-testid="bid-picker"]')).toBeVisible()
-  // 9278 whole-document nodes with the sheet open (9241 of them the matrix),
-  // measured 2026-08-10. Ceiling 9700 on the same principle. The gap between
+  // 9644 whole-document nodes with the sheet open (9607 of them the matrix),
+  // measured 2026-08-10 after the weekday labels landed. Ceiling 10000 on
+  // the same principle. The gap between
   // the two figures is the app chrome and the sheet — about 37 nodes — and
   // it is the sheet's unbounded growth this half of the test watches.
   const all = await page.evaluate(() => document.querySelectorAll('*').length)
   expect(all).toBeGreaterThan(nodes)
-  expect(all).toBeLessThan(9700)
+  expect(all).toBeLessThan(10000)
 })
 
 // A year is ~13,600px of grid. Reaching September by dragging is not a thing
@@ -744,4 +750,83 @@ test('OFF can be bid, takes the day, and moves no balance', async ({ page }) => 
   expect(await count()).not.toBe(before.manning)
   // ...and his annual balance has not moved, because OFF spends nothing.
   expect(await balance()).toBe(before.bal)
+})
+
+// The owner's complaint, from a phone: the chrome ate the screen and left
+// four rows of grid visible. Two things had to change — the topbar scrolls
+// away, and there is less of it to scroll past — and neither is visible to
+// jsdom, which computes no layout at all.
+test('the topbar scrolls away instead of holding the top of the screen', async ({ page }) => {
+  // A SHORT viewport on purpose. At 390x760 the whole page is now only 808px
+  // tall — the chrome shrank enough that there is barely anything to scroll,
+  // which is the change working but leaves nothing for this test to observe.
+  // 390x400 guarantees the page genuinely scrolls, so "does the topbar move
+  // with it" is a question that can be asked at all.
+  await page.setViewportSize({ width: 390, height: 400 })
+  const bar = page.locator('.topbar')
+  const before = (await bar.boundingBox())!
+  expect(before.y).toBeGreaterThanOrEqual(0)
+
+  await page.evaluate(() => window.scrollBy(0, 200))
+  // Prove the page genuinely scrolled before trusting the topbar's new
+  // position as evidence of anything.
+  expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(100)
+
+  const after = await bar.boundingBox()
+  // Either gone entirely or moved up with the page — what it must NOT do is
+  // stay where it was, which is what `position: sticky` made it do.
+  expect(after === null || after.y < before.y - 100).toBe(true)
+})
+
+// The other half of the owner's complaint, and the more important half: not
+// how the chrome behaves when scrolled, but how much of it there is. Measured
+// at 390x760 before the change — the title, the picker, the stage strip and
+// the month strip held 690px of a 760px screen.
+test('the chrome above the grid is a fraction of the screen, not most of it', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 760 })
+  const wrap = (await page.locator('.mx-wrap').boundingBox())!
+  // Everything above the first date column: topbar, stage strip, card header
+  // and month strip together.
+  expect(wrap.y).toBeLessThan(320)
+})
+
+// Scrolling the chrome away is only worth doing if the date header does not
+// go with it. That row is the one part of the top of this page that is
+// load-bearing while reading a grid.
+test('the date header stays put while the topbar goes', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 400 })
+  await page.evaluate(() => window.scrollBy(0, 200))
+  const head = page.locator('[data-testid="head-2026-01-15"]')
+  await expect(head).toBeVisible()
+  const box = (await head.boundingBox())!
+  expect(box.y).toBeGreaterThanOrEqual(0)
+  expect(box.y).toBeLessThan(760)
+})
+
+// The measurement behind the change: at 390x760 the chrome held 690px and
+// left four rows of grid. This pins the improvement as a number rather than
+// as a claim.
+test('the grid gets most of the screen on a phone once the chrome is scrolled away', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 760 })
+  await page.evaluate(() => window.scrollBy(0, 2000))
+
+  const rows = await page.evaluate(() => {
+    const seen = [...document.querySelectorAll('.mx tbody tr')]
+    return seen.filter(r => {
+      const b = r.getBoundingClientRect()
+      return b.top >= 0 && b.bottom <= window.innerHeight && b.height > 0
+    }).length
+  })
+  // Four rows was the complaint. Twelve of the sixteen aircrew is the answer.
+  expect(rows).toBeGreaterThanOrEqual(12)
+})
+
+test('every date column names its weekday', async ({ page }) => {
+  const dow = (d: string) => page.locator(`[data-testid="head-${d}"] .dow`).textContent()
+  expect(await dow('2026-01-05')).toBe('MON')
+  expect(await dow('2026-01-11')).toBe('SUN')
+  // Legible, not merely present: it is the smallest text in the grid.
+  const size = await page.locator('[data-testid="head-2026-01-05"] .dow')
+    .evaluate(el => parseFloat(getComputedStyle(el).fontSize))
+  expect(size).toBeGreaterThanOrEqual(8)
 })

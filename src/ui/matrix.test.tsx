@@ -93,6 +93,22 @@ describe('Matrix', () => {
     expect(head.className).toContain('weekend')
   })
 
+  // The owner's ask: "I should have a short form day title for each day. Like
+  // Mon, Tues Etc." On EVERY column, unlike the month label — the question it
+  // answers ("which Tuesday is this") is asked at every column, not only at
+  // the turn of a month.
+  it('names the weekday on every column', () => {
+    render(<Matrix />)
+    expect(screen.getByTestId('head-2026-01-05').querySelector('.dow')?.textContent).toBe('MON')
+    expect(screen.getByTestId('head-2026-01-06').querySelector('.dow')?.textContent).toBe('TUE')
+    expect(screen.getByTestId('head-2026-01-10').querySelector('.dow')?.textContent).toBe('SAT')
+    // Including the 1st, where it sits alongside the month label rather than
+    // instead of it.
+    const jan1 = screen.getByTestId('head-2026-01-01')
+    expect(jan1.querySelector('.mon')?.textContent).toBe('JAN')
+    expect(jan1.querySelector('.dow')?.textContent).toBe('THU')
+  })
+
   it('labels the first day of a month, and only the first day', () => {
     render(<Matrix />)
     const jan1 = screen.getByTestId('head-2026-01-01')
