@@ -1,5 +1,31 @@
 # Working agreements for this repo
 
+## Merge into `main` at the end of every change
+
+**Owner's standing request, 10 Aug 26.** Every change they ask for ends merged
+into `main` and pushed. They do not want to ask for it each time, and they do
+not want to review a pull request to get it.
+
+The reason it was asked for: two branches ran in parallel on 10 Aug because
+`main` sat untouched for a day while the real work lived on a branch nobody
+could see from `main`'s own `docs/RESUME.md`. A session read that file, took
+its word that `main` was the only branch, and rebuilt an entire completed plan
+from scratch. **Work that is not on `main` is work the next session cannot
+find.** Merging is what stops that happening twice.
+
+The gate, which is not optional and is the whole reason this is safe:
+
+- `npx vitest run`, `npm run build` and `npm run test:e2e` have all been **run**
+  and are green, with their real output reported
+- the working tree is clean and the feature branch is pushed
+
+**Never merge red.** If any of the three fails, say so, leave `main` alone, and
+fix it first — a merge is the reward for a green gate, not a step that happens
+regardless. If a merge would not fast-forward, do the merge, re-run the gate on
+the result, and only then push.
+
+Keep working on the feature branch afterwards; `main` moving does not end it.
+
 ## Notify when the turn is genuinely finished
 
 **Owner's standing request, 10 Aug 26.** When a turn's work is complete — all
