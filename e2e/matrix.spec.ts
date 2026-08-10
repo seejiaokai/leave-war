@@ -1,4 +1,29 @@
-import { expect, test } from '@playwright/test'
+import { expect, test, type Page } from '@playwright/test'
+
+const CAL_MONTHS = [
+  'JANUARY', 'FEBRUARY', 'MARCH', 'APRIL', 'MAY', 'JUNE',
+  'JULY', 'AUGUST', 'SEPTEMBER', 'OCTOBER', 'NOVEMBER', 'DECEMBER',
+]
+
+/** Drive a range calendar to a span the way a person does — walk to the
+ *  month, tap the start, walk on, tap the end. */
+async function pickSpan(page: Page, testid: string, from: string, to: string) {
+  const goTo = async (yyyymm: string) => {
+    for (let i = 0; i < 72; i++) {
+      const shown = (await page.locator(`[data-testid="${testid}-month"]`).textContent())!
+      const [name, year] = shown.split(' ')
+      const at = `${year}-${String(CAL_MONTHS.indexOf(name) + 1).padStart(2, '0')}`
+      if (at === yyyymm) return
+      await page.locator(`[data-testid="${testid}-${at < yyyymm ? 'next' : 'prev'}-month"]`).click()
+    }
+    throw new Error(`never reached ${yyyymm}`)
+  }
+  await goTo(from.slice(0, 7))
+  await page.locator(`[data-testid="${testid}-day-${from}"]`).click()
+  await goTo(to.slice(0, 7))
+  await page.locator(`[data-testid="${testid}-day-${to}"]`).click()
+}
+
 
 test.beforeEach(async ({ page }) => {
   await page.goto('/')
@@ -556,10 +581,12 @@ test('the new-leave-war sheet is anchored to the viewport, not the topbar', asyn
   const view = page.viewportSize()!
   expect(box.y).toBeGreaterThanOrEqual(0)
   expect(box.y + box.height).toBeLessThanOrEqual(view.height + 1)
-  // Anchored near the BOTTOM, which is where every other sheet sits and
-  // where a thumb already is on a phone. Clipped by the topbar it would sit
-  // at the very top instead.
-  expect(box.y).toBeGreaterThan(view.height / 2)
+  // Anchored to the BOTTOM, which is where every other sheet sits and where a
+  // thumb already is on a phone. Asserted on the sheet's bottom edge rather
+  // than its top: once this sheet gained a month calendar it became tall
+  // enough to reach well up the screen, and "its top is in the lower half"
+  // stopped being a statement about anchoring at all.
+  expect(view.height - (box.y + box.height)).toBeLessThan(40)
 
   const bar = (await page.locator('.topbar').boundingBox())!
   expect(box.y).toBeGreaterThan(bar.y + bar.height)
@@ -573,8 +600,7 @@ test('an admin creates a leave war, and it joins the picker', async ({ page }) =
   await page.locator('[data-testid="role-toggle"]').click()
   await page.locator('[data-testid="war-new"]').click()
   await page.fill('[data-testid="war-name"]', 'JUL 28')
-  await page.fill('[data-testid="war-start"]', '2028-07-01')
-  await page.fill('[data-testid="war-end"]', '2028-07-31')
+  await pickSpan(page, 'war', '2028-07-01', '2028-07-31')
   await page.locator('[data-testid="war-create"]').click()
 
   await expect(page.locator('[data-testid="war-sheet"]')).toHaveCount(0)
@@ -587,8 +613,7 @@ test('overlapping dates are refused, with the reason on screen', async ({ page }
   await page.locator('[data-testid="role-toggle"]').click()
   await page.locator('[data-testid="war-new"]').click()
   await page.fill('[data-testid="war-name"]', 'CLASH')
-  await page.fill('[data-testid="war-start"]', '2026-05-01')
-  await page.fill('[data-testid="war-end"]', '2026-08-31')
+  await pickSpan(page, 'war', '2026-05-01', '2026-08-31')
   await page.locator('[data-testid="war-create"]').click()
 
   await expect(page.locator('[data-testid="war-problem"]')).toBeVisible()
@@ -679,4 +704,44 @@ test('the bidding-window sheet is anchored to the viewport, not clipped', async 
   expect(box.y + box.height).toBeLessThanOrEqual(view.height + 1)
   const bar = (await page.locator('.topbar').boundingBox())!
   expect(box.y).toBeGreaterThan(bar.y + bar.height)
+})
+
+// A posted-out day is drawn as shaded grey diagonal lines — the owner asked
+// for it on 10 Aug 26, which is how we learned the hatch already there was
+// too faint to read on a phone. jsdom cannot see a gradient at all, so the
+// unit suite can only prove the `.gone` class was emitted.
+test('a posted-out cell is hatched, and an ordinary cell is not', async ({ page }) => {
+  const bgImage = (d: string) => page.locator(`[data-testid="cell-switcher-${d}"]`)
+    .evaluate(el => getComputedStyle(el).backgroundImage)
+
+  // SWITCHER is posted out on 2026-01-12, so the 13th is the first day gone.
+  const gone = await bgImage('2026-01-13')
+  expect(gone).toContain('repeating-linear-gradient')
+  expect(await bgImage('2026-01-09')).toBe('none')
+
+  // The hatch has to be visible against the cell it sits on, not a shade of
+  // the background. Taken as the STRONGEST stop in the gradient, not the
+  // first: `transparent` computes to `rgba(0, 0, 0, 0)` and leads the list,
+  // so reading stop one measured the gaps between the lines rather than the
+  // lines. Found by this test failing against a hatch that was in fact fine.
+  const alphas = [...gone.matchAll(/rgba\([\d\s,]+?,\s*([\d.]+)\)/g)].map(m => Number(m[1]))
+  expect(Math.max(...alphas)).toBeGreaterThanOrEqual(0.6)
+})
+
+// OFF is free leave (owner, 10 Aug 26): the person is gone from the manning
+// picture and no entitlement is spent. It has to be offered like any other
+// leave, or it cannot be asked for at all.
+test('OFF can be bid, takes the day, and moves no balance', async ({ page }) => {
+  const balance = () => page.locator('[data-testid="bal-dusk"]').textContent()
+  const count = () => page.locator('[data-testid="count-opsw-2026-02-11"]').textContent()
+  const before = { bal: await balance(), manning: await count() }
+
+  await page.locator('[data-testid="cell-dusk-2026-02-11"]').click()
+  await page.locator('[data-testid="bid-OFF"]').click()
+
+  await expect(page.locator('[data-testid="cell-dusk-2026-02-11"] .c')).toHaveText('OFF')
+  // The man is gone from the count...
+  expect(await count()).not.toBe(before.manning)
+  // ...and his annual balance has not moved, because OFF spends nothing.
+  expect(await balance()).toBe(before.bal)
 })

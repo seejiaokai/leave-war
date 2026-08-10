@@ -56,6 +56,7 @@ export interface Range {
 export function RangePicker({
   min,
   max,
+  anchor,
   value,
   onChange,
   testid = 'range',
@@ -64,6 +65,11 @@ export function RangePicker({
   min?: string
   /** Latest selectable date, inclusive. */
   max?: string
+  /** Which month to open on when nothing is selected yet. Separate from
+   *  `min` because the useful opening month is not always the earliest legal
+   *  one — a new leave war may legally start in the past, but the month worth
+   *  showing is the one after the last war ends. */
+  anchor?: string
   value: Range | null
   onChange: (range: Range | null) => void
   testid?: string
@@ -73,8 +79,8 @@ export function RangePicker({
   // has no clock, deliberately, and a calendar that opened on a real today
   // would show a month the leave war may not even cover.
   const [cursor, setCursor] = useState(() => {
-    const anchor = value?.from ?? min ?? '2026-01-01'
-    return `${anchor.slice(0, 7)}-01`
+    const at = value?.from ?? anchor ?? min ?? '2026-01-01'
+    return `${at.slice(0, 7)}-01`
   })
 
   const selectable = (d: string) => (!min || d >= min) && (!max || d <= max)

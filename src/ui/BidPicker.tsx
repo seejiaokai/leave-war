@@ -15,7 +15,9 @@
 
 import { useState } from 'react'
 import { formatCell, LEAVE_TYPES, type BidState, type Portion } from '../engine'
-import { setBidState, setCell, shiftBid } from '../state/store'
+import { setBidState, setCell, setCellRange, shiftBid } from '../state/store'
+import { RangePicker, type Range } from './RangePicker'
+import { shortSpan } from './dates'
 import './bidpicker.css'
 
 const PORTIONS: { portion: Portion; label: string; testid: string }[] = [
@@ -29,22 +31,44 @@ export function BidPicker({
   personId,
   date,
   current,
+  dates,
   onClose,
 }: {
   callsign: string
   personId: string
   date: string
   current: string
+  /** Every date in the war, used only for the range picker's bounds so a
+   *  fortnight cannot run off the end of the sheet it belongs to. */
+  dates: string[]
   onClose: () => void
 }) {
   // Deliberately not seeded from `current`: the portion resets to a whole
   // day for every cell opened. A picker that remembered the last choice
   // would silently write a half day on the next cell the bidder touched.
   const [portion, setPortion] = useState<Portion>('full')
+  // The range, if the bidder has asked for one. `null` means this one day —
+  // the common case, and the one that must stay a single tap.
+  const [range, setRange] = useState<Range | null>(null)
+  const [showCal, setShowCal] = useState(false)
+  const [note, setNote] = useState('')
 
   const write = (code: string) => {
-    setCell(personId, date, code)
-    onClose()
+    if (!range) {
+      setCell(personId, date, code)
+      return onClose()
+    }
+    // A range that crosses a locked day, a Raptor cell or a posting-out date
+    // writes what it may and says what it did not. Refusing the whole range
+    // would make a fortnight that happens to include one such day impossible
+    // to ask for at all.
+    const { written, skipped } = setCellRange(personId, range.from, range.to, code)
+    if (skipped === 0) return onClose()
+    setNote(
+      written === 0
+        ? 'None of those days could be written — they are locked, owned by Raptor, or outside your time in the squadron.'
+        : `${written} day${written === 1 ? '' : 's'} written. ${skipped} skipped — locked, owned by Raptor, or outside your time in the squadron.`,
+    )
   }
 
   return (
@@ -57,6 +81,49 @@ export function BidPicker({
           ✕
         </button>
       </div>
+
+      {/* How many DAYS, before how much of one. The owner's ask: a fortnight
+          of leave should be one selection, not fourteen taps on fourteen
+          cells. "Just this day" stays the default and stays a single tap —
+          the range is the exception, so it costs the extra tap. */}
+      <div className="bidsheet-row">
+        <span className="lab">How many</span>
+        <button
+          data-testid="span-one"
+          className={`pchip${range ? '' : ' on'}`}
+          aria-pressed={!range}
+          onClick={() => { setRange(null); setShowCal(false); setNote('') }}
+        >
+          Just this day
+        </button>
+        <button
+          data-testid="span-range"
+          className={`pchip${range ? ' on' : ''}`}
+          aria-pressed={!!range}
+          // Seeded with the day already tapped, so the calendar opens on the
+          // right month AND the very next tap completes the span. The bidder
+          // chose their start by opening this cell; asking for it again would
+          // be the extra work this control exists to remove.
+          onClick={() => { setShowCal(true); setRange(r => r ?? { from: date, to: date }); setNote('') }}
+        >
+          {range ? shortSpan(range.from, range.to) : 'Pick a range'}
+        </button>
+      </div>
+
+      {showCal && (
+        <div className="bidsheet-row">
+          {/* Bounded by the war, so a range cannot run off the end of the
+              sheet it belongs to. Opens on the day that was tapped, which is
+              the start the bidder already chose by opening this cell. */}
+          <RangePicker
+            testid="span"
+            min={dates[0]}
+            max={dates[dates.length - 1]}
+            value={range}
+            onChange={r => { setRange(r); setNote('') }}
+          />
+        </div>
+      )}
 
       <div className="bidsheet-row">
         <span className="lab">How much</span>
@@ -93,6 +160,7 @@ export function BidPicker({
         <button className="tchip clear" data-testid="bid-clear" onClick={() => write('')}>
           Clear
         </button>
+        {note && <span className="note warn" data-testid="span-note">{note}</span>}
       </div>
     </div>
   )

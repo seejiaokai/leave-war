@@ -9,6 +9,31 @@ beforeEach(() => {
   initStore(memoryBackend())
 })
 
+const CAL_MONTHS = [
+  'JANUARY', 'FEBRUARY', 'MARCH', 'APRIL', 'MAY', 'JUNE',
+  'JULY', 'AUGUST', 'SEPTEMBER', 'OCTOBER', 'NOVEMBER', 'DECEMBER',
+]
+
+/** Drive the range calendar to a span, the way an admin does: walk to the
+ *  month, tap the start, walk again if the end is in another month, tap the
+ *  end. Walking rather than jumping is the point — it is the interaction
+ *  being tested, not a shortcut around it. */
+function pickSpan(testid: string, from: string, to: string) {
+  const goTo = (yyyymm: string) => {
+    for (let i = 0; i < 72; i++) {
+      const [name, year] = screen.getByTestId(`${testid}-month`).textContent!.split(' ')
+      const at = `${year}-${String(CAL_MONTHS.indexOf(name) + 1).padStart(2, '0')}`
+      if (at === yyyymm) return
+      fireEvent.click(screen.getByTestId(at < yyyymm ? `${testid}-next-month` : `${testid}-prev-month`))
+    }
+    throw new Error(`never reached ${yyyymm}`)
+  }
+  goTo(from.slice(0, 7))
+  fireEvent.click(screen.getByTestId(`${testid}-day-${from}`))
+  goTo(to.slice(0, 7))
+  fireEvent.click(screen.getByTestId(`${testid}-day-${to}`))
+}
+
 describe('switching leave war', () => {
   it('lists every war, with the current one selected', () => {
     render(<Topbar />)
@@ -72,8 +97,7 @@ describe('creating a leave war', () => {
     render(<Topbar />)
     fireEvent.click(screen.getByTestId('war-new'))
     fireEvent.change(screen.getByTestId('war-name'), { target: { value: 'JUL 28' } })
-    fireEvent.change(screen.getByTestId('war-start'), { target: { value: '2028-07-01' } })
-    fireEvent.change(screen.getByTestId('war-end'), { target: { value: '2028-07-31' } })
+    pickSpan('war', '2028-07-01', '2028-07-31')
     fireEvent.click(screen.getByTestId('war-create'))
 
     expect(getState().wars.some(w => w.period.name === 'JUL 28')).toBe(true)
@@ -86,8 +110,7 @@ describe('creating a leave war', () => {
     render(<Topbar />)
     fireEvent.click(screen.getByTestId('war-new'))
     fireEvent.change(screen.getByTestId('war-name'), { target: { value: 'JUL 28' } })
-    fireEvent.change(screen.getByTestId('war-start'), { target: { value: '2028-07-01' } })
-    fireEvent.change(screen.getByTestId('war-end'), { target: { value: '2028-07-31' } })
+    pickSpan('war', '2028-07-01', '2028-07-31')
     fireEvent.click(screen.getByTestId('war-create'))
     expect(screen.queryByTestId('war-sheet')).toBeNull()
   })
@@ -98,8 +121,7 @@ describe('creating a leave war', () => {
     render(<Topbar />)
     fireEvent.click(screen.getByTestId('war-new'))
     fireEvent.change(screen.getByTestId('war-name'), { target: { value: 'CLASH' } })
-    fireEvent.change(screen.getByTestId('war-start'), { target: { value: '2026-03-15' } })
-    fireEvent.change(screen.getByTestId('war-end'), { target: { value: '2026-05-15' } })
+    pickSpan('war', '2026-03-15', '2026-05-15')
     fireEvent.click(screen.getByTestId('war-create'))
 
     expect(screen.getByTestId('war-sheet')).toBeTruthy()
@@ -116,8 +138,7 @@ describe('creating a leave war', () => {
     render(<Topbar />)
     fireEvent.click(screen.getByTestId('war-new'))
     fireEvent.change(screen.getByTestId('war-name'), { target: { value: 'JUL - SEP 27' } })
-    fireEvent.change(screen.getByTestId('war-start'), { target: { value: '2027-04-30' } })
-    fireEvent.change(screen.getByTestId('war-end'), { target: { value: '2027-08-31' } })
+    pickSpan('war', '2027-04-30', '2027-08-31')
     fireEvent.click(screen.getByTestId('war-create'))
 
     const said = screen.getByTestId('war-problem').textContent!
@@ -128,15 +149,22 @@ describe('creating a leave war', () => {
     expect(said).not.toContain('JAN - DEC 26')
   })
 
-  it('says why when the range runs backwards', () => {
+  // A backwards range is no longer REACHABLE from this sheet, and that is the
+  // improvement rather than a gap. With two date fields an admin could type
+  // an end before a start and had to be told off for it; the calendar treats
+  // an earlier second tap as "I meant to start there" and restarts, which is
+  // what someone reaching back actually means. The store's `backwards`
+  // refusal stays and is still tested there — it guards every other caller.
+  it('cannot be driven into a backwards range at all', () => {
     setRole('admin')
     render(<Topbar />)
     fireEvent.click(screen.getByTestId('war-new'))
     fireEvent.change(screen.getByTestId('war-name'), { target: { value: 'BACK' } })
-    fireEvent.change(screen.getByTestId('war-start'), { target: { value: '2028-07-31' } })
-    fireEvent.change(screen.getByTestId('war-end'), { target: { value: '2028-07-01' } })
+    pickSpan('war', '2028-07-31', '2028-07-01')
+    expect(screen.getByTestId('war-selection').textContent).toBe('1 Jul 28')
     fireEvent.click(screen.getByTestId('war-create'))
-    expect(screen.getByTestId('war-problem').textContent).toBeTruthy()
+    expect(screen.queryByTestId('war-problem')).toBeNull()
+    expect(getState().wars.some(w => w.period.name === 'BACK')).toBe(true)
   })
 
   it('cannot be created until it has a name and both dates', () => {
@@ -146,8 +174,7 @@ describe('creating a leave war', () => {
     expect(screen.getByTestId('war-create').hasAttribute('disabled')).toBe(true)
     fireEvent.change(screen.getByTestId('war-name'), { target: { value: 'JUL 28' } })
     expect(screen.getByTestId('war-create').hasAttribute('disabled')).toBe(true)
-    fireEvent.change(screen.getByTestId('war-start'), { target: { value: '2028-07-01' } })
-    fireEvent.change(screen.getByTestId('war-end'), { target: { value: '2028-07-31' } })
+    pickSpan('war', '2028-07-01', '2028-07-31')
     expect(screen.getByTestId('war-create').hasAttribute('disabled')).toBe(false)
   })
 
@@ -159,8 +186,7 @@ describe('creating a leave war', () => {
     const before = getState().currentId
     fireEvent.click(screen.getByTestId('war-new'))
     fireEvent.change(screen.getByTestId('war-name'), { target: { value: 'JUL 28' } })
-    fireEvent.change(screen.getByTestId('war-start'), { target: { value: '2028-07-01' } })
-    fireEvent.change(screen.getByTestId('war-end'), { target: { value: '2028-07-31' } })
+    pickSpan('war', '2028-07-01', '2028-07-31')
     fireEvent.click(screen.getByTestId('war-create'))
     expect(getState().currentId).toBe(before)
   })

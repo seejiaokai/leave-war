@@ -11,6 +11,7 @@ import {
   selectWar,
   setRole,
   setBidWindow,
+  setCellRange,
   clearBidWindow,
   shiftBid,
   subscribe,
@@ -1071,5 +1072,123 @@ describe('the bidding window', () => {
     backend.write('current', JSON.stringify('bad'))
     initStore(backend)
     expect(getState().wars.map(w => w.period.id)).toEqual(['y2026', 'y2027'])
+  })
+})
+
+describe('writing leave over a range', () => {
+  beforeEach(() => {
+    initStore(memoryBackend())
+  })
+
+  // The owner's ask: a fortnight of leave should be one selection, not
+  // fourteen taps on fourteen cells.
+  it('writes the same code across every day in the span', () => {
+    const { written, skipped } = setCellRange('dusk', '2026-02-09', '2026-02-20', 'LL')
+    expect(written).toBe(12)
+    expect(skipped).toBe(0)
+    for (let d = 9; d <= 20; d++) {
+      expect(getState().grid.dusk[`2026-02-${String(d).padStart(2, '0')}`]).toBe('LL')
+    }
+    expect(getState().grid.dusk?.['2026-02-08']).toBeUndefined()
+    expect(getState().grid.dusk?.['2026-02-21']).toBeUndefined()
+  })
+
+  it('gives every day in the span its own pending state', () => {
+    setCellRange('dusk', '2026-02-09', '2026-02-11', 'LL')
+    for (const d of ['2026-02-09', '2026-02-10', '2026-02-11']) {
+      expect(getState().states.dusk[d]?.state).toBe('pending')
+    }
+  })
+
+  it('writes both ends of the span, inclusive', () => {
+    setCellRange('dusk', '2026-02-09', '2026-02-11', 'LL')
+    expect(getState().grid.dusk['2026-02-09']).toBe('LL')
+    expect(getState().grid.dusk['2026-02-11']).toBe('LL')
+  })
+
+  it('writes a single day when both ends are the same', () => {
+    expect(setCellRange('dusk', '2026-02-09', '2026-02-09', 'LL').written).toBe(1)
+  })
+
+  it('writes nothing at all for a backwards span', () => {
+    const before = getVersion()
+    expect(setCellRange('dusk', '2026-02-20', '2026-02-09', 'LL')).toEqual({ written: 0, skipped: 0 })
+    expect(getVersion()).toBe(before)
+  })
+
+  // ONE notify for the whole range, not one per day. Without this a fortnight
+  // is fourteen re-renders and every subscriber watches the range being
+  // written a day at a time.
+  it('notifies once for the whole span', () => {
+    const fn = vi.fn()
+    subscribe(fn)
+    setCellRange('dusk', '2026-02-09', '2026-02-20', 'LL')
+    expect(fn).toHaveBeenCalledTimes(1)
+  })
+
+  it('saves the whole span, not only the last day of it', () => {
+    const backend = memoryBackend()
+    initStore(backend)
+    setCellRange('dusk', '2026-02-09', '2026-02-11', 'LL')
+    initStore(backend)
+    for (const d of ['2026-02-09', '2026-02-10', '2026-02-11']) {
+      expect(getState().grid.dusk[d]).toBe('LL')
+    }
+  })
+
+  // PARTIAL BY DESIGN. Refusing the whole range would make the common case —
+  // a fortnight that happens to include one locked day — impossible to ask
+  // for at all, so it writes what it may and reports what it did not.
+  it('writes up to the edge of the bidding window and reports the rest', () => {
+    const { written, skipped } = setCellRange('dusk', '2026-03-29', '2026-04-04', 'LL')
+    expect(written).toBe(3) // 29, 30, 31 March
+    expect(skipped).toBe(4) // 1-4 April, outside the window
+    expect(getState().grid.dusk['2026-03-31']).toBe('LL')
+    expect(getState().grid.dusk?.['2026-04-01']).toBeUndefined()
+  })
+
+  it('skips a cell Raptor owns and writes around it', () => {
+    setRole('admin')
+    const { written, skipped } = setCellRange('tata', '2026-01-08', '2026-01-10', 'LL')
+    expect(skipped).toBe(1)
+    expect(written).toBe(2)
+    // Raptor's own OIL on the 9th is untouched.
+    expect(getState().grid.tata['2026-01-09']).toBe('OIL')
+    expect(getState().grid.tata['2026-01-08']).toBe('LL')
+  })
+
+  // SWITCHER is posted out on 2026-01-12. Bidding leave for a man who has
+  // left is a data-entry accident, not a bid.
+  it('skips days outside a person\'s time in the squadron', () => {
+    const { written, skipped } = setCellRange('switcher', '2026-01-10', '2026-01-15', 'LL')
+    expect(written).toBe(3) // 10, 11, 12
+    expect(skipped).toBe(3) // 13, 14, 15 — posted out
+    expect(getState().grid.switcher?.['2026-01-13']).toBeUndefined()
+  })
+
+  it('writes nothing and notifies nobody when every day is refused', () => {
+    const before = getVersion()
+    const { written, skipped } = setCellRange('dusk', '2026-06-01', '2026-06-05', 'LL')
+    expect(written).toBe(0)
+    expect(skipped).toBe(5)
+    expect(getVersion()).toBe(before)
+  })
+
+  // The batching flag is released in a `finally`, so a throw mid-range cannot
+  // leave the store permanently silent. Asserted by writing again afterwards.
+  it('goes on notifying after a range that wrote nothing', () => {
+    setCellRange('dusk', '2026-06-01', '2026-06-05', 'LL')
+    const fn = vi.fn()
+    subscribe(fn)
+    setCell('dusk', '2026-02-09', 'LL')
+    expect(fn).toHaveBeenCalledTimes(1)
+  })
+
+  it('clears a whole span when given an empty code', () => {
+    setCellRange('dusk', '2026-02-09', '2026-02-11', 'LL')
+    setCellRange('dusk', '2026-02-09', '2026-02-11', '')
+    for (const d of ['2026-02-09', '2026-02-10', '2026-02-11']) {
+      expect(getState().grid.dusk?.[d]).toBeUndefined()
+    }
   })
 })

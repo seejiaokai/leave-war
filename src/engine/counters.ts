@@ -34,7 +34,9 @@ import { codeOf, LEAVE_TYPES, type CounterName } from './codes'
  * is mutable by whoever imports it.
  */
 export const COUNTERS: readonly CounterName[] = Object.freeze(
-  [...new Set(LEAVE_TYPES.map(t => t.counter))],
+  // `OFF` carries no counter — it is leave that spends no entitlement — so
+  // the nulls are dropped rather than becoming a column of nothing.
+  [...new Set(LEAVE_TYPES.map(t => t.counter).filter((c): c is CounterName => c !== null))],
 )
 
 const LABEL: Record<CounterName, string> = {

@@ -127,3 +127,54 @@ describe('evaluateDay and the bid state', () => {
     expect(out['2026-01-06'].counts.byCategory.IP).toBe(2)
   })
 })
+
+// Overseas duty takes the man out of the manning picture exactly as leave
+// does. Flagged by the owner on 10 Aug 26 — "OD will also count that manpower
+// as gone too" — and it was already true, because `OD` is a non-leave marker
+// and every non-leave marker removes the whole day. This test exists so that
+// stays true rather than being true by luck: a change that treated OD as
+// "present but not flying" (which is what FS and HS genuinely are) would pass
+// every other test in this file.
+describe('overseas duty', () => {
+  const people: Person[] = [
+    { id: 'ip1', callsign: 'IP1', seat: 'pilot', band: 'instructor', sxo: false, from: null, to: null },
+    { id: 'ip2', callsign: 'IP2', seat: 'pilot', band: 'instructor', sxo: false, from: null, to: null },
+  ]
+  const reqs: Requirements = {
+    default: {
+      sets: { amber: 1, red: 0.5 },
+      rules: [{ id: 'ip', label: 'IP', target: { kind: 'category', categories: ['IP'] }, threshold: { amber: 2, red: 1 } }],
+    },
+    overrides: {},
+  }
+  const D = '2026-01-05'
+
+  it('removes the whole man from the counts, and never as SC duty', () => {
+    const away = evaluateDay(people, { ip1: { [D]: 'OD' } }, {}, reqs, D)
+    expect(away.counts.byCategory.IP).toBe(1)
+    expect(away.counts.sets).toBe(0)
+
+    // The contrast that gives this its teeth. FS also leaves the flying
+    // count — someone on SC duty is not available to fly — but he IS at work,
+    // so he appears on the separate duty line that explains why the day looks
+    // thin. A man overseas is simply gone, and must never be counted there:
+    // a day thin because half the squadron is on SC reads very differently
+    // from one thin because half the squadron is abroad.
+    const scDuty = evaluateDay(people, { ip1: { [D]: 'FS' } }, {}, reqs, D)
+    expect(scDuty.counts.byCategory.IP).toBe(1)
+    expect(scDuty.counts.duty).toBe(1)
+    expect(away.counts.duty).toBe(0)
+  })
+
+  // Nobody bids for overseas duty — it happens to a person — so no decision
+  // can ever hand the man back. A refused OD is not a thing, and if a stray
+  // state ever landed on one it must not make a man abroad count as present.
+  it('stays gone whatever state is somehow attached', () => {
+    const states: States = { ip1: { [D]: { state: 'refused', source: 'bid' } } }
+    expect(evaluateDay(people, { ip1: { [D]: 'OD' } }, states, reqs, D).counts.byCategory.IP).toBe(1)
+  })
+
+  it('takes the day under the requirement, so the day reads red', () => {
+    expect(evaluateDay(people, { ip1: { [D]: 'OD' } }, {}, reqs, D).verdict).toBe('red')
+  })
+})

@@ -226,3 +226,40 @@ describe('balances across more than one leave war', () => {
     expect(drawnFrom([], 'ramp', 'annual')).toBe(0)
   })
 })
+
+// `OFF` is leave that costs nothing (owner, 10 Aug 26). It is the one leave
+// type with no counter, so the risk it carries is the opposite of every other
+// code's: not that it draws from the wrong pool, but that it draws from ANY.
+describe('free leave draws nothing', () => {
+  it('leaves every counter untouched however much OFF is taken', () => {
+    const sources = [{
+      grid: { ramp: { '2026-01-05': 'OFF', '2026-01-06': 'OFF', '2026-01-07': '*OFF' } },
+      states: {},
+    }]
+    for (const counter of COUNTERS) {
+      expect(drawnFrom(sources, 'ramp', counter)).toBe(0)
+    }
+  })
+
+  it('keeps a balance exactly where it was', () => {
+    const openings = { ramp: { annual: 10 } }
+    const sources = [{ grid: { ramp: { '2026-01-05': 'OFF' } }, states: {} }]
+    expect(balanceOf(openings, [], sources, 'ramp', 'annual')).toBe(10)
+  })
+
+  // The contrast that gives the two above their teeth: an ordinary leave type
+  // over the same day DOES draw, so a `drawnFrom` that had simply stopped
+  // counting would fail here rather than passing all three.
+  it('unlike ordinary leave over the same day', () => {
+    const sources = [{ grid: { ramp: { '2026-01-05': 'LL' } }, states: {} }]
+    expect(drawnFrom(sources, 'ramp', 'annual')).toBe(1)
+  })
+
+  // OFF has no counter, so it must not put a column in the panel — a counter
+  // nobody can ever have a balance of would be a column of blanks.
+  it('adds no counter to the panel', () => {
+    expect(COUNTERS).not.toContain(undefined)
+    expect(COUNTERS).not.toContain(null)
+    expect(COUNTERS).toEqual(['annual', 'oil', 'ccl', 'fcl', 'pl', 'el'])
+  })
+})

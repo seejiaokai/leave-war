@@ -4,7 +4,9 @@
 // and is never saved.
 
 import {
+  addDays,
   canEditCell,
+  inSquadron,
   isBiddable,
   windowFits,
   nextStage,
@@ -404,12 +406,26 @@ function persist(): void {
   backend.write('ledger', JSON.stringify(state.ledger))
 }
 
+/**
+ * Set while a multi-day write is in flight, so `updateCurrent` builds the
+ * state and skips the save and the notify. The caller releases it and does
+ * both once.
+ *
+ * A module-level flag rather than a batching API, because there is exactly
+ * one batching caller and JavaScript here is single-threaded: nothing can
+ * interleave between setting it and clearing it. `setCellRange` clears it in
+ * a `finally`, so a throw mid-range cannot leave the store permanently
+ * silent — which is the one failure this shape could otherwise have.
+ */
+let quiet = false
+
 /** Replace the war on screen, republish the derived fields, save and
  *  notify. Every write to a cell, a decision or a stage goes through here,
  *  so none of them can update a war without the interface following. */
 function updateCurrent(fn: (war: LeaveWar) => LeaveWar): void {
   const wars = state.wars.map((w: LeaveWar) => (w.period.id === state.currentId ? fn(w) : w))
   state = withCurrent({ ...state, wars })
+  if (quiet) return
   persist()
   notify()
 }
@@ -460,6 +476,70 @@ export function setCell(personId: string, date: string, code: string): void {
     grid: { ...w.grid, [personId]: row },
     states: { ...w.states, [personId]: srow },
   }))
+}
+
+/** What a range write did. `skipped` counts days it was not allowed to touch,
+ *  which is a fact the person deserves rather than a silent shortfall. */
+export interface RangeWrite {
+  written: number
+  skipped: number
+}
+
+/**
+ * Write the same code across every day from `from` to `to`, inclusive.
+ *
+ * The owner's ask, in their words: "instead of click a day 1 by 1 … So I
+ * don't need to keep clicking a leave input like for 2 weeks continuous."
+ *
+ * It writes through `setCell` day by day rather than reimplementing it,
+ * because `setCell` is the only function allowed to write a cell and its
+ * state together — a second write path is exactly how the two maps drift.
+ * The cost is one persist and one notify per day, which is why the whole run
+ * is wrapped: subscribers see one change, not fourteen.
+ *
+ * PARTIAL BY DESIGN. A range crossing a Raptor-owned cell, a posted-out day
+ * or the edge of the bidding window writes what it may and reports what it
+ * did not. Refusing the whole range would make the common case — a fortnight
+ * that happens to include one locked day — impossible to ask for at all.
+ */
+export function setCellRange(
+  personId: string,
+  from: string,
+  to: string,
+  code: string,
+): RangeWrite {
+  if (to < from) return { written: 0, skipped: 0 }
+
+  let written = 0
+  let skipped = 0
+  const person = state.people.find(p => p.id === personId)
+
+  // Suppressed for the run, then released once. Without this a fortnight is
+  // fourteen persists and fourteen re-renders, and every subscriber sees the
+  // range half-written thirteen times.
+  quiet = true
+  try {
+    for (let d = from; d <= to; d = addDays(d, 1)) {
+      const allowed =
+        !raptorOwns(state.states, personId, d) &&
+        canEditCell(state.period, state.role, d) &&
+        (!person || inSquadron(person, d))
+      if (!allowed) {
+        skipped++
+        continue
+      }
+      setCell(personId, d, code)
+      written++
+    }
+  } finally {
+    quiet = false
+  }
+
+  if (written > 0) {
+    persist()
+    notify()
+  }
+  return { written, skipped }
 }
 
 /** Record a decision on a bid. Deliberately not role-gated: there is no

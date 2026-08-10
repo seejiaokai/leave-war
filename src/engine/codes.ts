@@ -29,7 +29,17 @@ export interface Cell {
 export interface LeaveType {
   type: string
   label: string
-  counter: CounterName
+  /**
+   * The counter this draws down, or `null` for leave that costs nothing.
+   *
+   * `OFF` is the only free one (owner, 10 Aug 26): "free leave that doesn't
+   * consume any leave, but it will count that manpower as gone too". It is
+   * still LEAVE — the person asks for it and management answers, because it
+   * takes a man out of the manning picture exactly as annual leave does — so
+   * it is here rather than among the non-leave markers, which nobody bids
+   * for. What it is not is an entitlement, so it has no balance to draw.
+   */
+  counter: CounterName | null
 }
 
 // The seven leave types. All are biddable and all spend a counter — that is
@@ -53,6 +63,7 @@ export const LEAVE_TYPES: LeaveType[] = [
   { type: 'FCL', label: 'family care leave', counter: 'fcl' },
   { type: 'PL', label: 'paternity leave', counter: 'pl' },
   { type: 'EL', label: 'embarkation leave', counter: 'el' },
+  { type: 'OFF', label: 'off — free leave, no entitlement spent', counter: null },
 ]
 
 const LEAVE_TYPE_BY_CODE: Record<string, LeaveType> = Object.fromEntries(
@@ -170,7 +181,10 @@ function dayCodeFor(cell: Cell): DayCode {
       code: formatCell(cell),
       label: `${leave.label}${suffix}`,
       removes: amount as 0 | 0.5 | 1,
-      spends: { counter: leave.counter, amount },
+      // Free leave spends nothing, so it has no `spends` at all rather than a
+      // zero-amount one: every counter reader tests for the absence, and a
+      // zero would quietly appear in a balance's arithmetic as a real draw.
+      spends: leave.counter === null ? null : { counter: leave.counter, amount },
       earnsOil: 0,
       bid: true,
       duty: false,

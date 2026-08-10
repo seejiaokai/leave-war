@@ -332,6 +332,7 @@ export function Matrix() {
           personId={open.id}
           date={open.date}
           current={grid[open.id]?.[open.date] ?? ''}
+          dates={dates}
           onClose={close}
         />
       )}

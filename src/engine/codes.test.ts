@@ -138,8 +138,9 @@ describe('codeOf', () => {
 
   it('spends the right counter, scaled by the portion', () => {
     // Same reasoning as above: every leave type's counter and amount, not
-    // just LL and OIL, so a wrongly special-cased type shows up here.
-    for (const { type, counter } of LEAVE_TYPES) {
+    // just LL and OIL, so a wrongly special-cased type shows up here. `OFF`
+    // is excluded because it has no counter at all — its own case is below.
+    for (const { type, counter } of LEAVE_TYPES.filter(t => t.counter !== null)) {
       expect(codeOf(type)!.spends).toEqual({ counter, amount: 1 })
       expect(codeOf(`*${type}`)!.spends).toEqual({ counter, amount: 0.5 })
       expect(codeOf(`${type}*`)!.spends).toEqual({ counter, amount: 0.5 })
@@ -148,6 +149,21 @@ describe('codeOf', () => {
 
   it('spends nothing for medical, courses and overseas duty', () => {
     for (const c of ['M', 'CSE', 'OD']) expect(codeOf(c)!.spends).toBeNull()
+  })
+
+  // `OFF` is free leave (owner, 10 Aug 26): the person asks for it and it
+  // takes them out of the manning picture, but it draws no entitlement. That
+  // makes it the one leave type with NO counter, so it needs its own case —
+  // and `spends` must be absent rather than a zero-amount draw, because a
+  // zero would join a balance's arithmetic as if it were real.
+  it('takes the day for OFF and spends nothing at all', () => {
+    expect(codeOf('OFF')!.spends).toBeNull()
+    expect(codeOf('OFF')!.removes).toBe(1)
+    expect(codeOf('OFF')!.bid).toBe(true)
+    expect(codeOf('OFF')!.duty).toBe(false)
+    // Still a leave type, so it still comes in halves.
+    expect(codeOf('*OFF')!.removes).toBe(0.5)
+    expect(codeOf('*OFF')!.spends).toBeNull()
   })
 
   it('earns OIL only for SC duty', () => {

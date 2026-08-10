@@ -279,9 +279,15 @@
   background: rgba(255, 255, 255, .35);
 }
 
-/* Out-of-squadron cells: diagonal hatch rather than a flat grey block. */
+/* Out-of-squadron cells: shaded grey diagonal lines rather than a flat block.
+   The owner asked for exactly this on 10 Aug 26 — it already existed, and
+   their asking for it is the evidence that it was too faint to read as
+   anything on a phone. Widened from a 1px line every 5px to a 2px line every
+   6px, and lifted from .5 to .75 alpha, so the hatch is legible at the size a
+   day column actually is. A flat grey block is still the wrong answer: it
+   would read as a filled cell, and an empty posted-out day is not filled. */
 .mx td.gone {
-  background: repeating-linear-gradient(45deg, transparent, transparent 4px, rgba(42, 49, 58, .5) 4px, rgba(42, 49, 58, .5) 5px);
+  background: repeating-linear-gradient(45deg, transparent, transparent 4px, rgba(58, 67, 79, .75) 4px, rgba(58, 67, 79, .75) 6px);
 }
 
 .mx td.gone .c {

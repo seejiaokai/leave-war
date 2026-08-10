@@ -9,7 +9,9 @@
 // sheet in the app reads as the same object in the same place.
 
 import { useState } from 'react'
-import { clashingWar, createWar } from '../state/store'
+import { addDays } from '../engine'
+import { clashingWar, createWar, getState } from '../state/store'
+import { RangePicker, type Range } from './RangePicker'
 import { shortSpan } from './dates'
 import './bidpicker.css'
 
@@ -20,10 +22,20 @@ const WHY: Record<string, string> = {
   forbidden: 'Only an admin can create a leave war.',
 }
 
+/** The day after the last war ends — the month a new war almost always
+ *  starts in, and therefore the one worth opening the calendar on. NOT a
+ *  bound: a war earlier than every existing one is unusual but legal, and
+ *  forbidding it to save a few taps would be the wrong trade. */
+function nextFreeDay(): string {
+  const ends = getState().wars.map(w => w.period.end)
+  return ends.length ? addDays(ends.reduce((a, b) => (a > b ? a : b)), 1) : '2026-01-01'
+}
+
 export function WarSheet({ onClose }: { onClose: () => void }) {
   const [name, setName] = useState('')
-  const [start, setStart] = useState('')
-  const [end, setEnd] = useState('')
+  const [range, setRange] = useState<Range | null>(null)
+  const start = range?.from ?? ''
+  const end = range?.to ?? ''
   // A refusal has to SAY why, or the button reads as broken. The store
   // returns the reason; this turns it into the sentence an admin needs.
   const [problem, setProblem] = useState('')
@@ -69,22 +81,19 @@ export function WarSheet({ onClose }: { onClose: () => void }) {
         />
       </div>
 
+      {/* ONE calendar, not two date fields. The owner asked for this
+          directly: "instead of clicking 2 calendars for start and end date.
+          After I select start date it will allow me to click the next date as
+          the end date on the same calendar and show the dates I selected."
+          Two native pickers cannot show a range at all — the first has closed
+          before the second opens. */}
       <div className="bidsheet-row">
-        <span className="lab">From</span>
-        <input
-          type="date"
-          className="dateinput"
-          data-testid="war-start"
-          value={start}
-          onChange={e => { setStart(e.target.value); setProblem('') }}
-        />
-        <span className="lab" style={{ minWidth: 0 }}>to</span>
-        <input
-          type="date"
-          className="dateinput"
-          data-testid="war-end"
-          value={end}
-          onChange={e => { setEnd(e.target.value); setProblem('') }}
+        <span className="lab">Dates</span>
+        <RangePicker
+          testid="war"
+          anchor={nextFreeDay()}
+          value={range}
+          onChange={r => { setRange(r); setProblem('') }}
         />
       </div>
 

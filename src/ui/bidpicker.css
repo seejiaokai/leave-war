@@ -18,6 +18,18 @@
   border-radius: var(--r);
   box-shadow: 0 18px 48px rgba(0, 0, 0, .55);
   padding: 10px 12px 12px;
+  /* A sheet holding a month calendar is roughly 500px tall. Bounded and
+     scrolled INSIDE rather than allowed to grow off the top of the screen,
+     where the header naming whose leave it is would be the first thing lost.
+
+     BELT AND BRACES, not tested — said plainly because this repo does not
+     dress guards up. The gate asserts every sheet sits wholly inside the
+     viewport, and deleting these two lines does not break it: the tallest
+     sheet today is ~500px against a 664px phone, so nothing yet overflows.
+     It is here for the sheet that eventually does. */
+  max-height: calc(100vh - 28px);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .bidsheet-hd {
