@@ -1,9 +1,25 @@
 // The cycle a leave war moves through, and what each stage allows.
 //
-// Forward only. There is deliberately no way back: reopening a closed period
-// would mean bids arriving against decisions already made, and the owner
-// chose a cycle with stages precisely so that "why did this change after I
-// bid" always has an answer. A period that needs reopening is a new period.
+// It runs forward on its own and an ADMIN can step it back (owner, 10 Aug 26:
+// "as an admin I can open bidding again after closing it").
+//
+// It was forward-only before that, and the reason was real rather than
+// arbitrary: a bid arriving after a decision has been made is exactly the
+// confusion a cycle with stages exists to prevent, and the old comment here
+// said "a period that needs reopening is a new period". What that missed is
+// the ordinary case — bidding closes while somebody is on detachment, and a
+// whole new war is a heavy answer to one late input.
+//
+// Two things keep the original guarantee mostly intact, and both matter more
+// than the transition itself:
+//
+//   - **Stepping back is admin-only.** Going forward is not, which is a real
+//     asymmetry (see `docs/known-gaps.md`); reversing the cycle is the half
+//     worth holding to the account that runs the war.
+//   - **Nothing is erased.** The stage is one field. An approved bid stays
+//     approved and a refused one stays refused across a reopen, so "why did
+//     this change after I bid" still has an answer: it changed because
+//     somebody reopened the war, not because the record was rewritten.
 
 import { inBidWindow, type Period, type Stage } from './period'
 
@@ -29,6 +45,25 @@ const LABEL: Record<Stage, string> = {
 export function nextStage(stage: Stage): Stage | null {
   const i = STAGE_ORDER.indexOf(stage)
   return i < 0 || i === STAGE_ORDER.length - 1 ? null : STAGE_ORDER[i + 1]
+}
+
+/** One stage back, or `null` at draft. Reads the same frozen order as
+ *  `nextStage` so the two cannot describe different cycles. */
+export function previousStage(stage: Stage): Stage | null {
+  const i = STAGE_ORDER.indexOf(stage)
+  return i <= 0 ? null : STAGE_ORDER[i - 1]
+}
+
+/**
+ * Whether this role may step the period back from this stage.
+ *
+ * Admin only, and never from draft — the beginning of the cycle is not a
+ * place you return to, it is where you already are. Asked by the store before
+ * it moves anything and by the strip before it draws the control, so the
+ * refusal and the affordance cannot disagree.
+ */
+export function canReopen(stage: Stage, role: Role): boolean {
+  return role === 'admin' && previousStage(stage) !== null
 }
 
 /**

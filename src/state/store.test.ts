@@ -15,6 +15,7 @@ import {
   setPerson,
   clearBidWindow,
   shiftBid,
+  reopenStage,
   subscribe,
 } from './store'
 import { makeWar } from '../engine'
@@ -1261,5 +1262,93 @@ describe('editing the roster', () => {
     ]))
     initStore(backend)
     expect(getState().people.map(p => p.id)).toEqual(['solo'])
+  })
+})
+
+// Owner, 10 Aug 26: "as an admin I can open bidding again after closing it".
+describe('reopening a period', () => {
+  it('steps an admin back from closed to open', () => {
+    setRole('admin')
+    advanceStage()
+    expect(getState().period.stage).toBe('closed')
+    expect(reopenStage()).toBe(true)
+    expect(getState().period.stage).toBe('open')
+  })
+
+  it('lets an admin walk all the way back to draft', () => {
+    setRole('admin')
+    advanceStage()
+    advanceStage()
+    expect(getState().period.stage).toBe('published')
+    reopenStage()
+    reopenStage()
+    expect(getState().period.stage).toBe('open')
+    reopenStage()
+    expect(getState().period.stage).toBe('draft')
+  })
+
+  it('stops at draft rather than falling off the beginning', () => {
+    setRole('admin')
+    reopenStage()
+    expect(getState().period.stage).toBe('draft')
+    expect(reopenStage()).toBe(false)
+    expect(getState().period.stage).toBe('draft')
+  })
+
+  // The refusal lives at the write, not only in the strip that hides the
+  // button: the role switch is an affordance, so anything reachable from a
+  // console has to be refused here too.
+  it('refuses a member even though nothing hides the call from them', () => {
+    advanceStage()
+    expect(getState().role).toBe('member')
+    expect(getState().period.stage).toBe('closed')
+    expect(reopenStage()).toBe(false)
+    expect(getState().period.stage).toBe('closed')
+  })
+
+  // The whole reason reopening is safe enough to allow. Reopening changes
+  // what may happen next; it must rewrite nothing that already happened, or
+  // an admin reopening to catch one late input would silently undo every
+  // decision already made.
+  it('leaves every decision exactly as it was', () => {
+    setRole('admin')
+    advanceStage()
+    setBidState('asics', '2026-01-23', 'approved')
+    setBidState('jaguar', '2026-01-19', 'refused')
+    reopenStage()
+    expect(getState().period.stage).toBe('open')
+    expect(getState().states.asics['2026-01-23'].state).toBe('approved')
+    expect(getState().states.jaguar['2026-01-19'].state).toBe('refused')
+  })
+
+  it('leaves the grid and the bidding window alone', () => {
+    setRole('admin')
+    const grid = JSON.stringify(getState().grid)
+    const window = [getState().period.bidFrom, getState().period.bidTo]
+    advanceStage()
+    reopenStage()
+    expect(JSON.stringify(getState().grid)).toBe(grid)
+    expect([getState().period.bidFrom, getState().period.bidTo]).toEqual(window)
+  })
+
+  it('survives a reload, like every other stage change', () => {
+    const backend = memoryBackend()
+    initStore(backend)
+    setRole('admin')
+    advanceStage()
+    reopenStage()
+    initStore(backend)
+    expect(getState().period.stage).toBe('open')
+  })
+
+  // Wars are independent: reopening the one on screen must not walk another
+  // war's cycle back with it.
+  it('moves only the war on screen', () => {
+    setRole('admin')
+    const other = getState().wars.find(w => w.period.id !== getState().period.id)!
+    const before = other.period.stage
+    advanceStage()
+    reopenStage()
+    expect(getState().wars.find(w => w.period.id === other.period.id)!.period.stage).toBe(before)
   })
 })

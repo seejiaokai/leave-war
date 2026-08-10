@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { windowFits, type Period, type Stage } from './period'
-import { canDecide, canEdit, canEditCell, nextStage, stageLabel, STAGE_ORDER } from './stages'
+import { canDecide, canEdit, canEditCell, canReopen, nextStage, previousStage, stageLabel, STAGE_ORDER } from './stages'
 
 describe('stage transitions', () => {
   it('runs draft to open to closed to published', () => {
@@ -159,5 +159,55 @@ describe('windowFits', () => {
 
   it('refuses a backwards range', () => {
     expect(windowFits(p, '2026-09-30', '2026-07-01')).toBe(false)
+  })
+})
+
+// Reopening was deliberately impossible until the owner asked for it on
+// 10 Aug 26: "as an admin I can open bidding again after closing it". The
+// original rule read "forward only... a period that needs reopening is a new
+// period", and its reason was sound — a bid arriving after a decision has
+// been made is exactly the confusion stages exist to prevent. What the owner
+// wanted is the ordinary case behind that: bidding closed while somebody was
+// still away, and a whole new war is a heavy answer to a late input.
+describe('stepping a period back', () => {
+  it('walks back the way it came', () => {
+    expect(previousStage('published')).toBe('closed')
+    expect(previousStage('closed')).toBe('open')
+    expect(previousStage('open')).toBe('draft')
+  })
+
+  it('stops at draft — there is nowhere further back', () => {
+    expect(previousStage('draft')).toBeNull()
+  })
+
+  // The two directions must stay each other's inverse. Written as a loop over
+  // the real order rather than four hand-written pairs, so a fifth stage
+  // added to STAGE_ORDER is covered the day it appears.
+  it('is the exact inverse of going forward, at every stage', () => {
+    for (const s of STAGE_ORDER) {
+      const next = nextStage(s)
+      if (next) expect(previousStage(next)).toBe(s)
+      const back = previousStage(s)
+      if (back) expect(nextStage(back)).toBe(s)
+    }
+  })
+})
+
+describe('who may reopen', () => {
+  it('lets an admin step back from anywhere but draft', () => {
+    expect(canReopen('published', 'admin')).toBe(true)
+    expect(canReopen('closed', 'admin')).toBe(true)
+    expect(canReopen('open', 'admin')).toBe(true)
+  })
+
+  it('refuses at draft, where there is nothing to step back to', () => {
+    expect(canReopen('draft', 'admin')).toBe(false)
+  })
+
+  // The owner's words were "as an ADMIN". A member closing a war and then
+  // reopening it would put the cycle back where anyone can move it in both
+  // directions, which is the guarantee stages are for.
+  it('refuses a member at every stage', () => {
+    for (const s of STAGE_ORDER) expect(canReopen(s, 'member')).toBe(false)
   })
 })

@@ -9,7 +9,9 @@ import {
   inSquadron,
   isBiddable,
   windowFits,
+  canReopen,
   nextStage,
+  previousStage,
   raptorOwns,
   COUNTERS,
   makeWar,
@@ -701,12 +703,36 @@ export function setDayEvent(date: string, line: 0 | 1, text: string): boolean {
   return true
 }
 
-/** Walk the period to its next stage. Forward only, and a no-op at the end
- *  of the cycle — `nextStage` owns which transitions exist. */
+/** Walk the period to its next stage. A no-op at the end of the cycle —
+ *  `nextStage` owns which transitions exist. */
 export function advanceStage(): void {
   const next = nextStage(state.period.stage)
   if (!next) return
   updateCurrent(w => ({ ...w, period: { ...w.period, stage: next } }))
+}
+
+/**
+ * Step the period back one stage — how bidding is opened again after it has
+ * been closed (owner, 10 Aug 26).
+ *
+ * Re-checks the role here rather than trusting the strip to have hidden the
+ * control, for the same reason `setBidWindow` does: the role switch is an
+ * affordance, not a permission, so the refusal has to live where the write
+ * is. Returns whether it moved, so a caller can tell "not allowed" from
+ * "already at the beginning".
+ *
+ * **Only the stage changes.** Bids and the decisions on them are untouched:
+ * an approved bid is still approved after a reopen, and a refused one still
+ * refused. Reopening changes what may happen NEXT, and rewrites nothing that
+ * already happened — which is what keeps "why did this change after I bid"
+ * answerable now that the cycle can run backwards.
+ */
+export function reopenStage(): boolean {
+  if (!canReopen(state.period.stage, state.role)) return false
+  const back = previousStage(state.period.stage)
+  if (!back) return false
+  updateCurrent(w => ({ ...w, period: { ...w.period, stage: back } }))
+  return true
 }
 
 /** What an inbound Raptor input did here.

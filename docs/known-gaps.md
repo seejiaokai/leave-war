@@ -235,6 +235,28 @@ The roster is roughly one-and-a-quarter phone screens tall, so the header goes
 out of view during ordinary use rather than only in extreme cases. Worth
 raising with the owner rather than assuming it is fine.
 
+## The cycle runs backwards for an admin, and forwards for anyone
+
+Overturned on 10 Aug 26 at the owner's word: "as an admin I can open bidding
+again after closing it". It had been forward-only since the bidding plan, and
+the reason recorded in `stages.ts` was a real one — a bid arriving against a
+decision already made is exactly what a cycle with stages is for. What that
+missed is the ordinary case: bidding closes while somebody is on detachment,
+and a whole new leave war is a heavy answer to one late input.
+
+Two things were kept so the original guarantee mostly survives. **Nothing is
+erased** — the stage is one field, so every decision already made outlives a
+reopen — and **stepping back is admin only**.
+
+The asymmetry that leaves is deliberate but worth knowing: **advancing the
+stage is not gated at all**, so a member can close a war and then not be able
+to reopen it (they can flip the role switch and do it, which is the affordance
+model working as designed rather than a lock). Gating both directions would
+match the spec's own roles table, and it would break the existing strip test
+that advances as a member — it was left alone because the owner asked for the
+way back, not for the way forward to be taken away. Worth settling when
+accounts land and the roles stop being an affordance.
+
 ## Rulings made, so they are not relitigated
 
 - **The scrim lives in the `Sheet` wrapper, not beside each sheet.** Seven

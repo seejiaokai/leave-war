@@ -320,3 +320,59 @@ describe('shifting a bid', () => {
     })
   })
 })
+
+// Owner, 10 Aug 26: "as an admin I can open bidding again after closing it".
+describe('reopening the period from the strip', () => {
+  it('offers a member no way back', () => {
+    render(<StageBar />)
+    fireEvent.click(screen.getByTestId('stage-advance'))
+    expect(getState().period.stage).toBe('closed')
+    expect(screen.queryByTestId('stage-back')).toBeNull()
+  })
+
+  it('gives an admin a control back to bidding', () => {
+    render(<StageBar />)
+    fireEvent.click(screen.getByTestId('stage-advance'))
+    act(() => setRole('admin'))
+    fireEvent.click(screen.getByTestId('stage-back'))
+    expect(getState().period.stage).toBe('open')
+  })
+
+  // It names where it goes, exactly as the forward control does — the pair
+  // has to read as one cycle rather than as two unrelated buttons.
+  it('names the stage it returns to', () => {
+    act(() => setRole('admin'))
+    render(<StageBar />)
+    fireEvent.click(screen.getByTestId('stage-advance'))
+    expect(screen.getByTestId('stage-back').textContent).toContain('OPEN FOR BIDDING')
+    fireEvent.click(screen.getByTestId('stage-advance'))
+    expect(screen.getByTestId('stage-back').textContent).toContain('BIDDING CLOSED')
+  })
+
+  it('offers nothing at draft, where there is nowhere back to', () => {
+    act(() => setRole('admin'))
+    render(<StageBar />)
+    fireEvent.click(screen.getByTestId('stage-back'))
+    expect(getState().period.stage).toBe('draft')
+    expect(screen.queryByTestId('stage-back')).toBeNull()
+  })
+
+  // The point of the whole change: after reopening, the squadron can bid
+  // again. Asserted through the matrix rather than the stage field, because
+  // the stage is only interesting for what it lets people do.
+  it('lets a member bid again once an admin has reopened', () => {
+    act(() => setRole('admin'))
+    render(<StageBar />)
+    fireEvent.click(screen.getByTestId('stage-advance'))
+    render(<Matrix />)
+    act(() => setRole('member'))
+    fireEvent.click(screen.getByTestId('cell-dusk-2026-02-11'))
+    expect(screen.queryByTestId('bid-picker')).toBeNull()
+
+    act(() => setRole('admin'))
+    fireEvent.click(screen.getByTestId('stage-back'))
+    act(() => setRole('member'))
+    fireEvent.click(screen.getByTestId('cell-dusk-2026-02-11'))
+    expect(screen.getByTestId('bid-picker')).toBeTruthy()
+  })
+})

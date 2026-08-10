@@ -6,7 +6,7 @@ where the work stopped and what comes next, so a session picking it up cold does
 not have to reconstruct it from `git log`.
 
 **State as of 10 Aug 26, after the owner's phone review and a second round of
-their notes.** 591 unit tests, 129 Playwright runs across a phone and a
+their notes.** 610 unit tests, 135 Playwright runs across a phone and a
 desktop project, clean build, all verified first-hand. Work continues on
 `claude/bidding-plan-continuation-vqnrfz`, and **`main` is merged up to it** —
 see the merge agreement in `CLAUDE.md`.
@@ -32,7 +32,16 @@ language throughout.
 **A bid now has a whole life.** The squadron bids while the war is open;
 closing it makes the sheet view-only for members while the admin account keeps
 editing; an admin approves, refuses **or moves** each bid; the period walks
-draft → open → closed → published, forward only.
+draft → open → closed → published.
+
+**An admin can step the period back** (owner, 10 Aug 26: "as an admin I can
+open bidding again after closing it"). This overturned a forward-only rule
+whose reason was sound — a bid arriving after a decision is the confusion
+stages exist to prevent — so two things hold the original guarantee: stepping
+back is **admin only**, and **nothing is erased**. An approved bid is still
+approved after a reopen and a refused one still refused, so "why did this
+change after I bid" still has an answer: somebody reopened the war, and the
+record was not rewritten.
 
 **Balances are on screen**, including on a phone, which was the hard part.
 Six counters, one frozen column showing one of them at a time, cycled from
@@ -313,8 +322,8 @@ Both are in `docs/known-gaps.md` with the reasoning:
 ```
 npm install
 npm run dev                 # or: npm run build && npx vite preview --port 4173
-npx vitest run              # 591 tests
-npm run test:e2e            # 129 runs, phone and desktop (3 touch-only skips)
+npx vitest run              # 610 tests
+npm run test:e2e            # 135 runs, phone and desktop (3 touch-only skips)
 npm run build               # typecheck + production build
 ```
 

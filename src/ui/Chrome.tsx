@@ -4,11 +4,12 @@
 // the engine does not model. See CLAUDE-facing restyle brief for why.
 
 import { useLayoutEffect, useRef, useState } from 'react'
-import { evaluatePeriod, nextStage, stageLabel } from '../engine'
+import { canReopen, evaluatePeriod, nextStage, previousStage, stageLabel } from '../engine'
 import {
   advanceStage,
   clearBidWindow,
   focusDay,
+  reopenStage,
   getState,
   selectWar,
   setBidWindow,
@@ -171,6 +172,10 @@ export function StageBar() {
   const red = dates.filter(d => verdicts[d].verdict === 'red')
   const redDays = red.length
   const next = nextStage(period.stage)
+  // The way back, and who may take it. Both asked of the engine rather than
+  // worked out here, so the control the strip draws and the write the store
+  // will accept cannot disagree.
+  const back = canReopen(period.stage, role) ? previousStage(period.stage) : null
   const [listOpen, setListOpen] = useState(false)
   const showList = listOpen && redDays > 0
 
@@ -217,6 +222,25 @@ export function StageBar() {
       >
         → {next ? stageLabel(next) : 'END OF CYCLE'}
       </button>
+      {/* Stepping the cycle BACK — how bidding is opened again after being
+          closed (owner, 10 Aug 26). Admin only, and absent rather than
+          disabled for a member: a disabled control advertises something they
+          cannot have, and this one is not theirs to want.
+
+          It names where it returns to, exactly as the forward control names
+          where it goes, so the two read as one cycle. Nothing here is
+          destructive — every decision already made survives the move; see
+          `reopenStage`. */}
+      {back && (
+        <button
+          className="stage-go"
+          data-testid="stage-back"
+          title={`Step this period back to ${stageLabel(back)}. Bids and decisions already made are kept.`}
+          onClick={reopenStage}
+        >
+          ← {stageLabel(back)}
+        </button>
+      )}
       {/* Which part of the year the squadron may bid on. The war is a whole
           year on screen and the schedule firms up a quarter at a time, so
           this is what "the admin opens a period" means — the year stays

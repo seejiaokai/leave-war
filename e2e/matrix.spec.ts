@@ -1215,3 +1215,45 @@ test('scrolling the year stays responsive with the readout attached', async ({ p
   })
   expect(ms).toBeLessThan(2000)
 })
+
+// ---- reopening a closed period (owner, 10 Aug 26) ------------------------
+// "As an admin I can open bidding again after closing it." The unit suite
+// proves the rules; this proves the control is actually reachable, which is
+// a live question on a phone where the stage strip wraps onto three rows.
+
+test('an admin can reopen bidding after closing it', async ({ page }) => {
+  await page.locator('[data-testid="role-toggle"]').click()          // -> admin
+  await page.locator('[data-testid="stage-advance"]').click()        // open -> closed
+  await expect(page.locator('[data-testid="stage-now"]')).toHaveText('BIDDING CLOSED')
+
+  const back = page.locator('[data-testid="stage-back"]')
+  await expect(back).toContainText('OPEN FOR BIDDING')
+  // Clicking is the proof: a control that has wrapped off the strip, or that
+  // something else is sitting on top of, throws here rather than passing.
+  await back.click()
+  await expect(page.locator('[data-testid="stage-now"]')).toHaveText('OPEN FOR BIDDING')
+})
+
+test('a member is offered no way back', async ({ page }) => {
+  await page.locator('[data-testid="role-toggle"]').click()          // -> admin
+  await page.locator('[data-testid="stage-advance"]').click()        // open -> closed
+  await expect(page.locator('[data-testid="stage-back"]')).toHaveCount(1)
+  await page.locator('[data-testid="role-toggle"]').click()          // -> member
+  await expect(page.locator('[data-testid="stage-back"]')).toHaveCount(0)
+})
+
+// The reason reopening is safe enough to offer at all: it changes what may
+// happen next and rewrites nothing that already happened. A decision wiped by
+// a reopen would be invisible to every test that only watches the stage.
+test('a decision made before the reopen survives it', async ({ page }) => {
+  await page.locator('[data-testid="role-toggle"]').click()          // -> admin
+  await page.locator('[data-testid="stage-advance"]').click()        // open -> closed
+  await page.locator('[data-testid="cell-asics-2026-01-23"]').click()
+  await page.locator('[data-testid="decide-refuse"]').click()
+  const chip = page.locator('[data-testid="cell-asics-2026-01-23"] .c')
+  expect(await chip.getAttribute('class')).toContain('ref')
+
+  await page.locator('[data-testid="stage-back"]').click()
+  await expect(page.locator('[data-testid="stage-now"]')).toHaveText('OPEN FOR BIDDING')
+  expect(await chip.getAttribute('class')).toContain('ref')
+})
