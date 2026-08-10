@@ -210,6 +210,30 @@ test code needs to change.
 
 ## Rulings made, so they are not relitigated
 
+- **`focusDate` is view state, and it lives in the domain store on purpose.**
+  The stage strip and the matrix render independently of each other — neither
+  takes props from the other, so both stay renderable standalone in their own
+  tests — and the store is already the channel they share. It is not
+  persisted: where someone was last looking is not a fact about the leave war.
+  The `focusSeq` counter beside it exists because a date alone cannot say
+  "asked again", and with 365 columns the grid is almost never still where it
+  was left, so choosing the same day twice must snap back to it. It is cleared
+  on `selectWar`: wars do not overlap, so a date from the old one names no
+  column in the new grid.
+- **The under-manned list is positioned from JS, not CSS.** The stage strip is
+  `flex-wrap: wrap`, so the chip it hangs from sits in a different place on a
+  phone than on a desktop, and there is no CSS way to say "under the chip, but
+  never off the screen" when the anchor itself moves. Anchored naively it ran
+  past the right edge of the phone viewport and its rows stopped being
+  clickable — a mutation probe reproduces exactly that, failing on phone and
+  passing on desktop. `LIST_WIDTH` in `Chrome.tsx` must stay in step with
+  `.umlist`'s width in `chrome.css`.
+- **The tinted chips do not use Raptor's `.wk.on` ink.** Raptor's value is for
+  a chip that is one of several and only has to look *lit*; here the same
+  chips have to be *read*. Do not "restore" them to Raptor's palette — see the
+  comment on `.wk.on` in `chrome.css` for the measurement and why a contrast
+  ratio does not catch it.
+
 - **`DayCounts.duty` counts heads, not availability.** It increments by one for
   a half-day SC duty exactly as for a full day. This is deliberate — it answers
   "how many people are on SC today", which is a head count, not a fraction of a

@@ -66,6 +66,15 @@ interface State {
    *  there is no login — so this decides which controls appear, not who is
    *  allowed to use them. See `docs/known-gaps.md`. */
   role: Role
+
+  /** The day the matrix has been asked to bring into view, or null. */
+  focusDate: string | null
+  /** Bumped on every request, including a repeat of the same date. The matrix
+   *  jumps on a change to THIS, not to `focusDate`: a year is 365 columns, so
+   *  the grid is almost never still where it was left, and asking again for
+   *  the day you are notionally already on must snap you back to it. A date
+   *  alone cannot say "asked again". */
+  focusSeq: number
 }
 
 let backend: StorageBackend = memoryBackend()
@@ -96,6 +105,8 @@ function blank(): State {
     // The squadron is the common case, so the app opens as one. An admin
     // says so deliberately rather than arriving with the locks already off.
     role: 'member',
+    focusDate: null,
+    focusSeq: 0,
   })
 }
 
@@ -789,12 +800,29 @@ export function shiftBid(personId: string, from: string, to: string): ShiftResul
   return 'shifted'
 }
 
+/**
+ * Ask the matrix to bring one day into view.
+ *
+ * View state in the domain store, deliberately: the stage strip and the
+ * matrix render independently of each other on purpose — neither takes props
+ * from the other, so both stay renderable standalone in their own tests — and
+ * the store is already the channel they share. It is not persisted; where
+ * someone was last looking is not a fact about the leave war.
+ */
+export function focusDay(date: string): void {
+  state = { ...state, focusDate: date, focusSeq: state.focusSeq + 1 }
+  notify()
+}
+
 /** Put a different leave war on screen. Unknown ids are ignored rather than
  *  blanking the grid — a stale link is not worth an empty page. */
 export function selectWar(id: string): void {
   if (id === state.currentId) return
   if (!state.wars.some(w => w.period.id === id)) return
-  state = withCurrent({ ...state, currentId: id })
+  // The focus is dropped with the war it pointed into. Wars do not overlap,
+  // so a date from the old one names no column in the new grid — carrying it
+  // across would mark nothing and send the next jump nowhere.
+  state = withCurrent({ ...state, currentId: id, focusDate: null })
   persist()
   notify()
 }

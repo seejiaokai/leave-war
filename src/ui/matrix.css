@@ -580,3 +580,12 @@
   outline-offset: 1px;
   color: var(--ink);
 }
+
+/* The day the under-manned list jumped to. An accent ring rather than a fill:
+   the header may already carry `.blocked`, `.weekend` or `.locked`, and a
+   fill would fight whichever of those won the cascade. This only says "here",
+   and must not overwrite what the column already means. */
+.mx thead th.day.focus {
+  box-shadow: inset 0 0 0 2px var(--accent);
+  color: var(--ink);
+}

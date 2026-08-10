@@ -1,4 +1,4 @@
-import { useRef, useState, type TouchEvent } from 'react'
+import { useEffect, useRef, useState, type TouchEvent } from 'react'
 import {
   balanceOf,
   canDecide,
@@ -45,7 +45,7 @@ function monthLabel(date: string): string | null {
 
 export function Matrix() {
   useVersion()
-  const { people, period, grid, states, requirements, role, openings, ledger, wars } = getState()
+  const { people, period, grid, states, requirements, role, openings, ledger, wars, focusDate, focusSeq } = getState()
   const dates = period.days.map(d => d.date)
   const verdicts = evaluatePeriod(people, grid, states, requirements, dates)
 
@@ -105,6 +105,19 @@ export function Matrix() {
       .reduce((a, b) => a + b, 0)
     wrap.scrollLeft += cell.getBoundingClientRect().left - wrap.getBoundingClientRect().left - frozen
   }
+
+  // The under-manned list asks for a day the same way the month strip asks
+  // for a month, through the one `jumpTo` above — so a target lands clear of
+  // both frozen columns without that measurement existing twice.
+  //
+  // Keyed on `focusSeq` rather than `focusDate`: choosing the same day again
+  // has to snap back to it after the grid has been dragged away, and a date
+  // alone cannot express that. jsdom reports every rect as 0, which makes the
+  // jump a harmless no-op there; the browser gate is what proves it moves.
+  useEffect(() => {
+    if (focusDate) jumpTo(focusDate)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusSeq, focusDate])
 
   // Every "may this be written" question now goes through `canEditCell`,
   // which folds the stage, the role and the bidding window into one answer
@@ -201,7 +214,7 @@ export function Matrix() {
                     <th
                       key={d.date}
                       data-testid={`head-${d.date}`}
-                      className={`day${d.blocked ? ' blocked' : ''}${isWeekend(d.date) ? ' weekend' : ''}${lockedDate(d.date) ? ' locked' : ''}`}
+                      className={`day${d.blocked ? ' blocked' : ''}${isWeekend(d.date) ? ' weekend' : ''}${lockedDate(d.date) ? ' locked' : ''}${d.date === focusDate ? ' focus' : ''}`}
                       title={[d.blocked ? d.blockedReason : '', d.events.filter(Boolean).join(' / ')]
                         .filter(Boolean)
                         .join(' — ')}

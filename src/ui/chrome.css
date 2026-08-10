@@ -100,10 +100,21 @@
   font-weight: 500;
 }
 
+/* Raptor's `.wk.on` is the SELECTED chip in a row of week buttons: its green
+   is doing comparative work against grey siblings, and pale-green ink on a
+   green tint reads fine there because the eye is being asked "which one is
+   lit", not "read this". Here it is a lone control carrying the war's name,
+   so it has to actually be READ — and #A8E6BC on a green wash measures ~10.9:1
+   by luminance while still being hard going, because ink and field share a hue
+   and the eye gets almost no edge. A contrast ratio never flags this; the
+   owner did (10 Aug 26).
+   The tint stays — it is what marks the period as live — and the ink goes
+   near-white so the separation is hue as well as luminance. Do not "restore"
+   this to Raptor's value: the context is different, and that is the point. */
 .wk.on {
-  background: rgba(87, 201, 122, .14);
-  color: #A8E6BC;
-  border-color: rgba(87, 201, 122, .55);
+  background: rgba(87, 201, 122, .16);
+  color: #EAF9EF;
+  border-color: rgba(87, 201, 122, .7);
   font-weight: 600;
 }
 
@@ -119,7 +130,9 @@
   background: rgba(20, 24, 29, .35);
 }
 
-.filters .lab {
+/* Not scoped to `.filters` any more: the period picker in the topbar carries
+   the same kind of label, and the two must read identically. */
+.lab {
   font-size: 10px;
   letter-spacing: .14em;
   text-transform: uppercase;
@@ -142,17 +155,19 @@
 
 /* Stage tint: only 'open' has a comp reference to match (the squadron's
    normal working state); other stages stay the neutral chip rather than
-   guessing at colours nothing has approved. */
+   guessing at colours nothing has approved. Same ink lift as `.wk.on`, and
+   for the same reason — these are the app's tinted-chip pairs and they must
+   not drift apart. */
 .fchip.stage-open {
-  background: rgba(87, 201, 122, .14);
-  color: #A8E6BC;
-  border-color: rgba(87, 201, 122, .55);
+  background: rgba(87, 201, 122, .16);
+  color: #EAF9EF;
+  border-color: rgba(87, 201, 122, .7);
 }
 
 .fchip.undermanned {
   background: rgba(240, 85, 95, .16);
-  color: #FFAAB0;
-  border-color: rgba(240, 85, 95, .5);
+  color: #FFE3E5;
+  border-color: rgba(240, 85, 95, .65);
 }
 
 /* ---- the stage: card wrapper around the matrix ---- */
@@ -244,11 +259,23 @@
   cursor: pointer;
   appearance: none;
   padding-right: 26px;
-  background-image: linear-gradient(45deg, transparent 50%, #A8E6BC 50%),
-    linear-gradient(135deg, #A8E6BC 50%, transparent 50%);
+  background-image: linear-gradient(45deg, transparent 50%, #EAF9EF 50%),
+    linear-gradient(135deg, #EAF9EF 50%, transparent 50%);
   background-position: calc(100% - 14px) 50%, calc(100% - 9px) 50%;
   background-size: 5px 5px, 5px 5px;
   background-repeat: no-repeat;
+}
+
+/* The dropped-open list, which is the half the owner actually complained
+   about. A native option list inherits the select's own colours, so the green
+   chip styling above was painting pale-green rows on a green field — worse
+   than the closed control, because the popup has no border to break it up and
+   there are several rows of it. The options are given the neutral panel
+   colours instead: the chip stays green, the list it opens does not. */
+.warpick option {
+  background: var(--panel-2);
+  color: var(--ink);
+  font-weight: 500;
 }
 
 .warnew {
@@ -319,7 +346,9 @@
     padding: 6px 12px;
   }
 
-  .filters .lab {
+  /* Not scoped to `.filters` any more: the period picker in the topbar carries
+   the same kind of label, and the two must read identically. */
+.lab {
     font-size: 9px;
     letter-spacing: .1em;
     margin-right: 0;
@@ -336,4 +365,87 @@
   .stage {
     padding: 8px 10px 20px;
   }
+}
+
+/* ---- the under-manned list ----------------------------------------------
+   `position: fixed`, with its offsets set from JS rather than anchored in
+   CSS. The strip is `flex-wrap: wrap`, so the chip this hangs from sits in a
+   different place on a phone than on a desktop and there is no CSS way to say
+   "under the chip, but never off the screen" when the anchor itself moves.
+   Fixed rather than absolute for the same reason `.bidsheet` is — see the
+   note on WarSheet in Chrome.tsx about `backdrop-filter` making an ancestor
+   the containing block. */
+.umscrim {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+}
+
+.umlist {
+  position: fixed;
+  top: 96px;
+  left: 8px;
+  z-index: 41;
+  width: 244px;
+  background: var(--panel);
+  border: 1px solid var(--edge);
+  border-radius: 12px;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, .6);
+  overflow: hidden;
+}
+
+.umlist-hd {
+  padding: 9px 12px;
+  background: var(--panel-2);
+  border-bottom: 1px solid var(--edge);
+  font-size: 10px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  font-weight: 700;
+}
+
+/* The rows scroll, not the panel: the header has to stay put, and a war can
+   red far more days than fit a phone screen. */
+.umlist-body {
+  max-height: min(320px, calc(100vh - 160px));
+  overflow-y: auto;
+}
+
+.umrow {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 12px;
+  background: none;
+  border: 0;
+  border-bottom: 1px solid rgba(42, 49, 58, .6);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.umrow:last-child {
+  border-bottom: 0;
+}
+
+.umrow:hover {
+  background: rgba(240, 85, 95, .12);
+}
+
+.umrow .d {
+  font-weight: 700;
+  min-width: 62px;
+  white-space: nowrap;
+}
+
+/* The rule that broke and its figure — the reason this row is in the list. */
+.umrow .why {
+  color: #FFAAB0;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
 }

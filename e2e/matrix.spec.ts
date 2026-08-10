@@ -1001,3 +1001,107 @@ test('a member reads the events and cannot type into them', async ({ page }) => 
   await expect(page.locator('[data-testid="event-0-2026-01-01"]')).toHaveText('PH')
   await expect(page.locator('[data-testid="event-in-0-2026-01-01"]')).toHaveCount(0)
 })
+
+// ---- the period label, the contrast, and the under-manned list -----------
+// All three from the owner's review of 10 Aug 26.
+
+test('the period picker says what it is', async ({ page }) => {
+  await expect(page.locator('[data-testid="period-label"]')).toHaveText('Period')
+  // The visible label has to name the control for a screen reader too, not
+  // merely sit next to it.
+  expect(await page.locator('[data-testid="war-picker"]').getAttribute('aria-label'))
+    .toContain('Period')
+})
+
+// The complaint was green ink on a green field. Luminance contrast never
+// caught it — the old pair measured ~10.9:1 — so this pins what actually
+// broke: ink that is a tint of its own background's hue gives the eye no
+// edge. A near-neutral ink is the fix, and this is what holds it.
+test('the tinted chips are not ink in their own background hue', async ({ page }) => {
+  for (const sel of ['.wk.on', '.fchip.stage-open', '.fchip.undermanned']) {
+    const c = await page.locator(sel).first().evaluate(el => getComputedStyle(el).color)
+    const [r, g, b] = c.match(/\d+/g)!.map(Number)
+    const max = Math.max(r, g, b)
+    expect(max - Math.min(r, g, b)).toBeLessThan(0.12 * max)
+    expect(max).toBeGreaterThan(200)
+  }
+})
+
+// The half the owner actually complained about: a native option list inherits
+// the select's colours, so styling the closed chip green painted the dropped
+// list pale-green on green with no border to break up the rows. Options are
+// not reachable by getComputedStyle once the popup is native, so this asserts
+// the rule that governs them.
+test('the picker options are neutral, not the chip green', async ({ page }) => {
+  const opt = await page.locator('[data-testid="war-picker"] option').first()
+    .evaluate(el => {
+      const s = getComputedStyle(el)
+      return { color: s.color, bg: s.backgroundColor }
+    })
+  const [r, g, b] = opt.color.match(/\d+/g)!.map(Number)
+  const max = Math.max(r, g, b)
+  expect(max - Math.min(r, g, b)).toBeLessThan(0.12 * max)
+  expect(opt.bg).not.toBe('rgba(0, 0, 0, 0)')
+})
+
+test('the under-manned chip opens the days that caused it', async ({ page }) => {
+  await page.locator('[data-testid="undermanned"]').click()
+  const rows = page.locator('[data-testid^="undermanned-day-"]')
+  await expect(rows).toHaveCount(7)
+  // Each row names the rule that broke, not just the date.
+  await expect(page.locator('[data-testid="undermanned-day-2026-01-01"]')).toContainText('SXO')
+})
+
+// The point of the list is landing on the day. jsdom reports every rect as
+// 0x0, so the unit suite proves the right column was MARKED and nothing about
+// whether 365 columns actually moved. 10 Feb is the last red day and sits far
+// off the right edge on both projects.
+test('choosing a day jumps the grid to it, clear of the frozen columns', async ({ page }) => {
+  const wrap = page.locator('.mx-wrap')
+  expect(await wrap.evaluate(el => el.scrollLeft)).toBe(0)
+
+  await page.locator('[data-testid="undermanned"]').click()
+  await page.locator('[data-testid="undermanned-day-2026-02-10"]').click()
+
+  await expect.poll(() => wrap.evaluate(el => el.scrollLeft), { timeout: 5000 })
+    .toBeGreaterThan(0)
+
+  // "Scrolled somewhere right" is not the claim. The claim is that the column
+  // is visible AND not hiding under the two frozen columns, which is the
+  // whole reason `jumpTo` measures them.
+  const box = await page.evaluate(() => {
+    const w = document.querySelector('.mx-wrap')!.getBoundingClientRect()
+    const h = document.querySelector('[data-testid="head-2026-02-10"]')!.getBoundingClientRect()
+    const frozen = ['.who', '.bal']
+      .map(s => document.querySelector('.mx-wrap ' + s)?.getBoundingClientRect().width ?? 0)
+      .reduce((a, b) => a + b, 0)
+    return { wl: w.left, wr: w.right, hl: h.left, hr: h.right, frozen }
+  })
+  expect(box.hl).toBeGreaterThanOrEqual(box.wl + box.frozen - 1)
+  expect(box.hr).toBeLessThanOrEqual(box.wr + 1)
+})
+
+test('the jumped-to day is visibly marked', async ({ page }) => {
+  await page.locator('[data-testid="undermanned"]').click()
+  await page.locator('[data-testid="undermanned-day-2026-01-15"]').click()
+  const head = page.locator('[data-testid="head-2026-01-15"]')
+  expect(await head.getAttribute('class')).toContain('focus')
+  // A class resolving to no paint would satisfy the unit test and show the
+  // scheduler nothing.
+  expect(await head.evaluate(el => getComputedStyle(el).boxShadow)).not.toBe('none')
+})
+
+// The list is positioned from JS precisely so this cannot happen. On a phone
+// the chip sits far enough right that a list anchored to its left edge runs
+// past the viewport and stops being clickable at all.
+test('the under-manned list stays on screen and its rows are reachable', async ({ page }) => {
+  await page.locator('[data-testid="undermanned"]').click()
+  const box = (await page.locator('[data-testid="undermanned-list"]').boundingBox())!
+  const view = page.viewportSize()!
+  expect(box.x).toBeGreaterThanOrEqual(0)
+  expect(box.x + box.width).toBeLessThanOrEqual(view.width)
+  expect(box.y).toBeGreaterThanOrEqual(0)
+  // Clicking is the real proof: an intercepted row throws here.
+  await page.locator('[data-testid="undermanned-day-2026-01-05"]').click()
+  await expect(page.locator('[data-testid="undermanned-list"]')).toHaveCount(0)
+})

@@ -2,7 +2,7 @@ import { act, render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { getState, initStore, setBidState } from '../state/store'
 import { memoryBackend } from '../state/storage'
-import { StageBar } from './Chrome'
+import { StageBar, Topbar } from './Chrome'
 
 beforeEach(() => {
   initStore(memoryBackend())
@@ -31,5 +31,18 @@ describe('the stage strip', () => {
     const after = screen.getByTestId('undermanned').textContent
     expect(after).not.toBe(before)
     expect(Number(after!.split(' ')[0])).toBe(Number(before!.split(' ')[0]) - 1)
+  })
+})
+
+describe('the leave war picker', () => {
+  it('says what the picker is, not just which war is in it', () => {
+    render(<Topbar />)
+    // "JAN - DEC 26" on its own does not say it is the period being bid for,
+    // and the picker is the first thing on the screen. The stage strip below
+    // labels every one of its chips this way; this one was the odd one out.
+    expect(screen.getByTestId('period-label').textContent).toBe('Period')
+    // The label has to name the control for a screen reader too, not just
+    // sit beside it — `aria-label` was carrying a different word entirely.
+    expect(screen.getByTestId('war-picker').getAttribute('aria-label')).toContain('Period')
   })
 })

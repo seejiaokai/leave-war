@@ -3,21 +3,26 @@
 // yet (My leave, Ledger, Rules, Roster) and no "closes in N days", which
 // the engine does not model. See CLAUDE-facing restyle brief for why.
 
-import { useState } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import { evaluatePeriod, nextStage, stageLabel } from '../engine'
 import {
   advanceStage,
   clearBidWindow,
+  focusDay,
   getState,
   selectWar,
   setBidWindow,
   setRole,
 } from '../state/store'
 import { RangePicker, type Range } from './RangePicker'
-import { shortSpan } from './dates'
+import { shortDate, shortSpan } from './dates'
 import { WarSheet } from './WarSheet'
 import { useVersion } from './useStore'
 import './chrome.css'
+
+/** Kept in step with `.umlist`'s width in chrome.css — the clamp has to know
+ *  how wide the thing it is clamping actually is. */
+const LIST_WIDTH = 244
 
 export function Topbar() {
   useVersion()
@@ -50,10 +55,14 @@ export function Topbar() {
             strip immediately below already names the current war's — so the
             cost lands on every phone screen to answer a question only
             someone mid-switch is asking. */}
+        {/* The picker carried only the war's name, which says what is in it
+            and not what it is. Every chip in the stage strip below is
+            labelled this way already. */}
+        <span className="lab" data-testid="period-label">Period</span>
         <select
           className="wk on warpick"
           data-testid="war-picker"
-          aria-label="Which leave war"
+          aria-label="Period — which leave war"
           value={period.id}
           onChange={e => selectWar(e.target.value)}
         >
@@ -155,8 +164,31 @@ export function StageBar() {
   // be handed the same `states`, or the strip counts a different squadron
   // from the one the grid below it is painting.
   const verdicts = evaluatePeriod(people, grid, states, requirements, dates)
-  const redDays = dates.filter(d => verdicts[d].verdict === 'red').length
+  // The red days themselves, not just how many. Recomputed every render like
+  // the tally beside them: a list built once would send a scheduler to a day
+  // a refusal had already recovered.
+  const red = dates.filter(d => verdicts[d].verdict === 'red')
+  const redDays = red.length
   const next = nextStage(period.stage)
+  const [listOpen, setListOpen] = useState(false)
+  const showList = listOpen && redDays > 0
+
+  // Where the list hangs. Measured, because the strip wraps: the chip is in a
+  // different place on a phone than on a desktop, and a list anchored to its
+  // left edge runs off the right of a narrow viewport and stops being
+  // clickable at all.
+  const chipRef = useRef<HTMLButtonElement>(null)
+  const [at, setAt] = useState<{ left: number; top: number } | null>(null)
+  useLayoutEffect(() => {
+    if (!showList) { setAt(null); return }
+    const r = chipRef.current?.getBoundingClientRect()
+    if (!r) return
+    const margin = 8
+    setAt({
+      left: Math.max(margin, Math.min(r.left, window.innerWidth - LIST_WIDTH - margin)),
+      top: r.bottom + margin,
+    })
+  }, [showList, redDays])
 
   return (
     <div className="filters">
@@ -227,9 +259,57 @@ export function StageBar() {
         {role === 'admin' ? 'ADMIN' : 'MEMBER'}
       </button>
       <span className="lab" style={{ marginLeft: 12 }}>Under-manned</span>
-      <span className={`fchip${redDays > 0 ? ' undermanned' : ''}`} data-testid="undermanned">
+      {/* The tally used to be a dead end: it said seven days were broken and
+          left the scheduler to find them by eye across 365 columns. It opens
+          the list of those days instead, and choosing one jumps the grid to
+          it — the same jump the month strip makes, for the same reason. */}
+      <button
+        ref={chipRef}
+        className={`fchip${redDays > 0 ? ' undermanned' : ''}`}
+        data-testid="undermanned"
+        onClick={() => setListOpen(o => !o)}
+        disabled={redDays === 0}
+        aria-expanded={showList}
+        title={redDays === 0
+          ? 'No day in this war breaks a manning rule'
+          : 'Show the days that break a manning rule'}
+      >
         {redDays} day{redDays === 1 ? '' : 's'}
-      </span>
+      </button>
+      {showList && (
+        <>
+          <div className="umscrim" data-testid="undermanned-scrim" onClick={() => setListOpen(false)} />
+          <div
+            className="umlist"
+            data-testid="undermanned-list"
+            role="dialog"
+            aria-label="Under-manned days"
+            style={at ? { left: at.left, top: at.top } : undefined}
+          >
+            <div className="umlist-hd">Days breaking a manning rule</div>
+            <div className="umlist-body">
+              {red.map(date => {
+                // Which rules are red, and the figure that broke each. "SXO 0"
+                // and "IWSO 1" are different problems and a scheduler acts
+                // differently on them, so a list of bare dates would just mean
+                // opening all seven to find out which is which.
+                const broken = verdicts[date].results.filter(r => r.verdict === 'red')
+                return (
+                  <button
+                    key={date}
+                    className="umrow"
+                    data-testid={`undermanned-day-${date}`}
+                    onClick={() => { focusDay(date); setListOpen(false) }}
+                  >
+                    <span className="d">{shortDate(date)}</span>
+                    <span className="why">{broken.map(r => `${r.label} ${r.have}`).join(' · ')}</span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        </>
+      )}
       {/* Rendered inside `.filters` rather than `.topbar`, which carries no
           `backdrop-filter` — see the note on WarSheet in Topbar for why that
           distinction decides where a `position: fixed` sheet actually lands. */}

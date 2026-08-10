@@ -5,10 +5,21 @@ spreadsheet the squadron uses to bid for leave ahead of time. This file says
 where the work stopped and what comes next, so a session picking it up cold does
 not have to reconstruct it from `git log`.
 
-**State as of 10 Aug 26, after the owner's phone review.** 548 unit tests,
-101 Playwright runs across a phone and a desktop project, clean build, all
-verified first-hand. Work sits on `claude/bidding-plan-continuation-vqnrfz`,
-branched from `main`.
+**State as of 10 Aug 26, after the owner's phone review and a second round of
+their notes.** 562 unit tests, 115 Playwright runs across a phone and a
+desktop project, clean build, all verified first-hand. Work sits on
+`claude/bidding-plan-continuation-vqnrfz`, branched from `main`.
+
+> **Read this before you start.** `main`'s own `docs/RESUME.md` still says
+> "`main` is the only branch and the default". That was true when it was
+> written and false eight minutes later, when this branch began. On 10 Aug a
+> session took it at its word, never ran `git branch -a`, and rebuilt the
+> whole bidding plan from scratch on a second branch
+> (`claude/resume-docs-5rgc42`) — nine commits duplicating the first nine
+> here, then diverging on the period model, the bid states and FCL. That work
+> is discarded; only three of its ideas survived, and they are the three
+> owner's notes listed below. **Check the remote for branches before trusting
+> any prose about which one is live**, including this paragraph.
 
 ## What exists
 
@@ -78,6 +89,25 @@ derived and an SXO reading `OPSP(S)`.
 
 **Every day has two event lines**, admin-written and squadron-read, widening
 to fit and then wrapping without growing anybody's row but their own.
+
+**The period picker is labelled, and the tinted chips are readable** (owner,
+10 Aug 26). The picker carried the war's name with nothing saying what it
+was. Its green came from Raptor, where `.wk.on` marks the SELECTED chip among
+grey week buttons — the eye is asked "which one is lit", not "read this".
+Standing alone it has to be read, and pale-green ink on a green wash measures
+~10.9:1 by luminance while still being hard going, because ink and field
+share a hue. **A contrast ratio never flags this.** The tint stays; the ink is
+near-white. The dropped-open option list mattered more than the closed chip —
+a native `<option>` inherits the select's colours, so it was several rows of
+green on green with no border to break them up, and it now takes the neutral
+panel colours instead.
+
+**The under-manned tally opens the days that caused it.** It was a dead end:
+it said seven days were broken and left a scheduler to find them across 365
+columns. Each row names the day and the rule and figure that broke it, and
+choosing one jumps the grid to that column and rings it — through the same
+`jumpTo` the month strip uses, so a target lands clear of both frozen columns
+without that measurement existing twice.
 
 Five rulings are visible on screen rather than merely written down:
 
@@ -255,8 +285,8 @@ Both are in `docs/known-gaps.md` with the reasoning:
 ```
 npm install
 npm run dev                 # or: npm run build && npx vite preview --port 4173
-npx vitest run              # 548 tests
-npm run test:e2e            # 101 runs, phone and desktop (3 touch-only skips)
+npx vitest run              # 562 tests
+npm run test:e2e            # 115 runs, phone and desktop (3 touch-only skips)
 npm run build               # typecheck + production build
 ```
 
