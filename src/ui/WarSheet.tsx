@@ -9,7 +9,8 @@
 // sheet in the app reads as the same object in the same place.
 
 import { useState } from 'react'
-import { createWar } from '../state/store'
+import { clashingWar, createWar } from '../state/store'
+import { shortSpan } from './dates'
 import './bidpicker.css'
 
 const WHY: Record<string, string> = {
@@ -32,6 +33,19 @@ export function WarSheet({ onClose }: { onClose: () => void }) {
   const create = () => {
     const result = createWar(name, start, end)
     if (result === 'created') return onClose()
+    // An overlap NAMES the war it hit. The generic sentence sent the owner
+    // hunting: they typed 2027 dates, were told "overlap", and concluded the
+    // rule was broken because nothing on screen mentioned the 2027 war that
+    // already existed. Which war, and over which dates, is the whole answer.
+    if (result === 'overlap') {
+      const clash = clashingWar(start, end)
+      if (clash) {
+        return setProblem(
+          `${shortSpan(start, end)} is already covered by ${clash.name} ` +
+          `(${shortSpan(clash.start, clash.end)}). A day can only belong to one leave war.`,
+        )
+      }
+    }
     setProblem(WHY[result] ?? 'That leave war could not be created.')
   }
 

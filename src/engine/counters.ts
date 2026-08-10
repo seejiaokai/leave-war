@@ -41,7 +41,7 @@ const LABEL: Record<CounterName, string> = {
   annual: 'ANNUAL',
   oil: 'OIL',
   ccl: 'CCL',
-  pcl: 'PCL',
+  fcl: 'FCL',
   pl: 'PL',
   el: 'EL',
 }

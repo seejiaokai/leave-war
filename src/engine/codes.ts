@@ -16,7 +16,7 @@
 // an abbreviation like the old `HO` — is what is stored, typed and read back
 // from a CSV.
 
-export type CounterName = 'annual' | 'oil' | 'ccl' | 'pcl' | 'pl' | 'el'
+export type CounterName = 'annual' | 'oil' | 'ccl' | 'fcl' | 'pl' | 'el'
 
 export type Portion = 'full' | 'am' | 'pm'
 
@@ -36,16 +36,21 @@ export interface LeaveType {
 // what makes them leave rather than a marker. Exported so the bid picker can
 // list them without duplicating this table.
 //
-// `FCL` was here until 10 Aug 26 and is gone at the owner's instruction. It
-// had never been expanded — the spec recorded that its meaning was never
-// confirmed — so it was a code nobody could explain and a counter nobody
-// could reconcile.
+// `FCL` and `PCL` were BOTH here until 10 Aug 26, because this author could
+// not tell them apart and guessed there were two. There is one. The owner
+// settled it that afternoon: **there is no parentcare leave; the code is
+// FCL, family care leave.** `PCL` was the invention and is gone; `FCL` is
+// back with the expansion it never had. `PL` is unrelated — paternity leave,
+// which is a real and separate entitlement.
+//
+// So the earlier note here, that FCL "was a code nobody could explain", had
+// it precisely backwards: FCL is the one that could be explained.
 export const LEAVE_TYPES: LeaveType[] = [
   { type: 'LL', label: 'local leave', counter: 'annual' },
   { type: 'OL', label: 'overseas leave', counter: 'annual' },
   { type: 'OIL', label: 'off in lieu', counter: 'oil' },
   { type: 'CCL', label: 'child care leave', counter: 'ccl' },
-  { type: 'PCL', label: 'parentcare leave', counter: 'pcl' },
+  { type: 'FCL', label: 'family care leave', counter: 'fcl' },
   { type: 'PL', label: 'paternity leave', counter: 'pl' },
   { type: 'EL', label: 'embarkation leave', counter: 'el' },
 ]

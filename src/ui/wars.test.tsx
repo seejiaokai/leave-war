@@ -93,7 +93,7 @@ describe('creating a leave war', () => {
   })
 
   // Refusing has to SAY why, or the button reads as broken.
-  it('says why when the dates clash with a war that exists', () => {
+  it('refuses dates that clash with a war that exists, and keeps the sheet open', () => {
     setRole('admin')
     render(<Topbar />)
     fireEvent.click(screen.getByTestId('war-new'))
@@ -102,9 +102,30 @@ describe('creating a leave war', () => {
     fireEvent.change(screen.getByTestId('war-end'), { target: { value: '2026-05-15' } })
     fireEvent.click(screen.getByTestId('war-create'))
 
-    expect(screen.getByTestId('war-problem').textContent).toContain('overlap')
     expect(screen.getByTestId('war-sheet')).toBeTruthy()
     expect(getState().wars.every(w => w.period.name !== 'CLASH')).toBe(true)
+  })
+
+  // Naming the war is the whole message. The owner typed Apr–Aug 27, was told
+  // only "those dates overlap", and reported it as a bug — reasonably, since
+  // the dates plainly did not touch 2026 and nothing on screen mentioned the
+  // 2027 war that already existed. The clash is with JAN - DEC 27, and the
+  // sentence has to say so and say over what dates.
+  it('names the war it clashed with, and the span that war covers', () => {
+    setRole('admin')
+    render(<Topbar />)
+    fireEvent.click(screen.getByTestId('war-new'))
+    fireEvent.change(screen.getByTestId('war-name'), { target: { value: 'JUL - SEP 27' } })
+    fireEvent.change(screen.getByTestId('war-start'), { target: { value: '2027-04-30' } })
+    fireEvent.change(screen.getByTestId('war-end'), { target: { value: '2027-08-31' } })
+    fireEvent.click(screen.getByTestId('war-create'))
+
+    const said = screen.getByTestId('war-problem').textContent!
+    expect(said).toContain('JAN - DEC 27')
+    expect(said).toContain('1 Jan 27 – 31 Dec 27')
+    expect(said).toContain('30 Apr 27 – 31 Aug 27')
+    // And it must be the war actually hit, not simply the first in the list.
+    expect(said).not.toContain('JAN - DEC 26')
   })
 
   it('says why when the range runs backwards', () => {

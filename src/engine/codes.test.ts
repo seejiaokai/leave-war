@@ -26,7 +26,7 @@ describe('parseCell', () => {
   })
 
   it('parses every leave type', () => {
-    for (const type of ['LL', 'OL', 'OIL', 'CCL', 'PCL', 'PL', 'EL']) {
+    for (const type of ['LL', 'OL', 'OIL', 'CCL', 'FCL', 'PL', 'EL']) {
       expect(parseCell(type)).toEqual({ type, portion: 'full' })
     }
   })

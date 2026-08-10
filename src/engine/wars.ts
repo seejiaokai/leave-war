@@ -54,8 +54,18 @@ export const blankWar = makeWar
  *
  * Touching ends do not overlap: a war ending 31 March and one starting
  * 1 April are adjacent, which is the normal case and must stay allowed.
+ *
+ * Takes a bare span rather than a whole `Period` because the caller that
+ * matters most is asking about dates that are not a period yet — an admin
+ * typing two dates into the new-war sheet. `Period` satisfies this
+ * structurally, so every existing caller is unaffected.
  */
-export function overlapping(a: Period, b: Period): boolean {
+export interface Span {
+  start: string
+  end: string
+}
+
+export function overlapping(a: Span, b: Span): boolean {
   return a.start <= b.end && b.start <= a.end
 }
 

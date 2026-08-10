@@ -29,7 +29,7 @@ describe('stateOf', () => {
 
 describe('isBiddable', () => {
   it('is true for leave a person bids for, whole day or half', () => {
-    for (const c of ['LL', 'OL', 'OIL', 'CCL', 'PCL', 'PL', 'EL', '*LL', 'LL*', '*OIL']) {
+    for (const c of ['LL', 'OL', 'OIL', 'CCL', 'FCL', 'PL', 'EL', '*LL', 'LL*', '*OIL']) {
       expect(isBiddable(c)).toBe(true)
     }
   })

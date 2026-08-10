@@ -100,7 +100,7 @@ Every code carries four facts, replacing today's "any text means gone":
 | `OIL` | full OIL | 1.0 | OIL | — | yes |
 | `HO` | half OIL | 0.5 | 0.5 OIL | — | yes |
 | `CCL` | child care leave | 1.0 | CCL | — | yes |
-| `PCL` | parentcare leave | 1.0 | PCL | — | yes |
+| `FCL` | family care leave | 1.0 | FCL | — | yes |
 | `PL` | paternity leave | 1.0 | PL | — | yes |
 | `EL` | embarkation leave | 1.0 | EL | — | yes |
 | `M` | medical (HL/ATT C) | 1.0 | — | — | no |
@@ -113,11 +113,15 @@ Every code carries four facts, replacing today's "any text means gone":
 The code list is configurable — adding one is data, not a code change — in the
 same way RAPTOR's stores list is configurable.
 
-**`FCL` was removed on 10 Aug 26** at the owner's instruction. It had been
-carried here with its behaviour known (own counter, removes the day) but its
-expansion never confirmed — a code nobody could say the meaning of, and a
-counter nobody could reconcile. Removing it took its counter with it, because
-the counter list is derived from this table rather than restated beside it.
+**`FCL` was removed on the morning of 10 Aug 26 and restored that afternoon**,
+and the round trip is worth recording because the mistake was this document's.
+It carried BOTH `FCL` and `PCL`, which the owner settled as one code, not two:
+**there is no parentcare leave; it is FCL, family care leave.** `PCL` was the
+invention and is gone. `PL` is a separate entitlement — paternity leave — and
+was never in question.
+
+Both edits took a counter with them without anyone touching the counter list,
+because that list is derived from this table rather than restated beside it.
 
 ### SC duty and the counts
 
@@ -130,7 +134,7 @@ while making the reason visible.
 ## Counters
 
 Rather than a fixed set of balances, a person carries a **named counter per
-entitlement**: annual leave, OIL, CCL, PCL, PL, EL, and any added later.
+entitlement**: annual leave, OIL, CCL, FCL, PL, EL, and any added later.
 Each spending code names the counter it draws from. A new entitlement next year
 is configuration.
 

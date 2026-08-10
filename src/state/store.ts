@@ -566,6 +566,24 @@ export function selectWar(id: string): void {
   notify()
 }
 
+/**
+ * Which existing war already covers part of this span, if any.
+ *
+ * `createWar` returns a bare `'overlap'`, and "those dates overlap a leave
+ * war that already exists" sends an admin hunting through the picker for
+ * which one. The owner hit exactly that: they typed Apr–Aug 27, were told
+ * "overlap", and reasonably concluded it was a bug because the dates plainly
+ * did not touch 2026 — the war they clashed with was JAN - DEC 27, and
+ * nothing on screen said so.
+ *
+ * A selector rather than a wider `CreateWarResult`, because the refusal
+ * itself is a tested contract and this is a question about the sentence, not
+ * about the rule.
+ */
+export function clashingWar(start: string, end: string): Period | null {
+  return state.wars.find(w => overlapping(w.period, { start, end }))?.period ?? null
+}
+
 /** Why a war was not created. */
 export type CreateWarResult = 'created' | 'overlap' | 'backwards' | 'unnamed' | 'forbidden'
 

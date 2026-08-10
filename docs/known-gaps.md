@@ -113,11 +113,18 @@ things are deliberately absent:
 
 ## Removing a leave type is a breaking data change
 
-`FCL` was removed on 10 Aug 26. The counter list is derived from the code
-catalogue, so its counter went with it and no other file needed editing —
-but **stored balances that still name a removed counter are rejected on
-load**, and `openings` or `ledger` falls back to the seed entire rather than
-dropping just the stale entries.
+Twice over, on the same day. `FCL` was removed on the morning of 10 Aug 26,
+and that afternoon the owner settled the confusion that caused it: **there is
+no PCL.** This author could not tell FCL from PCL, guessed there were two,
+and removed the wrong one. The catalogue now carries `FCL` — family care
+leave — and no `PCL` at all. `PL` is unrelated and unchanged.
+
+The counter list is derived from the code catalogue, so a counter follows its
+leave type in and out with no other file edited — the property both changes
+proved. But **stored balances that still name a counter the catalogue no
+longer has are rejected on load**, and `openings` or `ledger` falls back to
+the seed entire rather than dropping just the stale entries. Anyone whose
+browser holds a balance from this morning naming `pcl` gets the seed back.
 
 That is the established rule for every stored shape here (an unknown value
 means the blob is not trustworthy), and it is the right default while this is

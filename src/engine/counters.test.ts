@@ -22,7 +22,7 @@ describe('COUNTERS', () => {
   // list does not. Both figures moved together when FCL was removed on
   // 10 Aug 26, without this list being edited: it is derived, not restated.
   it('is the six entitlements, one fewer than the leave types', () => {
-    expect(COUNTERS).toEqual(['annual', 'oil', 'ccl', 'pcl', 'pl', 'el'])
+    expect(COUNTERS).toEqual(['annual', 'oil', 'ccl', 'fcl', 'pl', 'el'])
   })
 
   it('has a label for every counter', () => {

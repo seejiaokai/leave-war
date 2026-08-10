@@ -366,11 +366,51 @@ test('the two frozen columns sit flush — no gap, no overlap', async ({ page })
   expect(Math.abs(bal.x - (who.x + who.width))).toBeLessThan(1)
 })
 
+// This test USED to assert only `not rgba(0, 0, 0, 0)`, and that is exactly
+// how it let a real defect through: the row-hover rule repainted the frozen
+// cell `rgba(59, 198, 232, 0.05)`, which is not transparent and is not opaque
+// either, so the grid scrolled visibly underneath it while this passed. The
+// owner found it on a phone. "Not transparent" was never the requirement —
+// FULLY opaque is, so alpha is what gets asserted now.
+//
+// The hovered case is the one that broke, and it is not an exotic state on a
+// touch screen: a tap leaves the row hovered until something else is tapped,
+// so on a phone the column stays see-through for as long as you look at it.
 test('the balance column is opaque — day cells never show through it', async ({ page }) => {
+  const bal = page.locator('[data-testid="bal-ramp"]')
+  const alphaOf = (css: string) => {
+    const parts = css.match(/[\d.]+/g)!
+    return parts.length < 4 ? 1 : Number(parts[3])
+  }
+
   await page.locator('.mx-wrap').evaluate(el => el.scrollBy(600, 0))
-  const bg = await page.locator('[data-testid="bal-ramp"]')
-    .evaluate(el => getComputedStyle(el).backgroundColor)
-  expect(bg).not.toBe('rgba(0, 0, 0, 0)')
+  const day = page.locator('[data-testid="cell-ramp-2026-01-15"]')
+  // A cell in the SAME ROW that the pointer will not be on. Asserting the
+  // row lights up needs a cell the pointer is not touching: the hovered one
+  // changes colour anyway through `.mx td.act:hover`, so it cannot tell
+  // "the row lights up" from "the cell does".
+  const sibling = page.locator('[data-testid="cell-ramp-2026-01-16"]')
+  const who = page.locator('[data-testid="row-ramp"] .who')
+  const bg = (l: typeof day) => l.evaluate(el => getComputedStyle(el).backgroundColor)
+
+  // Every at-rest reading is taken BEFORE anything is hovered. Taking them
+  // after a hover was a real mistake in this test's first draft: the row was
+  // already lit, so "at rest" and "hovered" were the same measurement and
+  // the comparison could only ever be false.
+  const balAtRest = await bg(bal)
+  const siblingAtRest = await bg(sibling)
+  expect(alphaOf(balAtRest)).toBe(1)
+
+  await day.hover()
+
+  // The defect: opaque at rest, opaque hovered. Nothing shows through.
+  expect(alphaOf(await bg(bal))).toBe(1)
+  // The callsign column was always exempt; assert it stays that way.
+  expect(alphaOf(await bg(who))).toBe(1)
+  // ...and the row hover this rule exists for still happens, so a "fix" that
+  // simply deleted the rule does not pass. `alpha < 1` would not do here
+  // either: an untinted cell is transparent, which is translucent too.
+  expect(await bg(sibling)).not.toBe(siblingAtRest)
 })
 
 // The space arithmetic, checked against a real browser rather than read off

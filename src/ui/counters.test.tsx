@@ -48,7 +48,7 @@ describe('the counter column', () => {
       seen.push(screen.getByTestId('counter-name').textContent!)
       fireEvent.click(screen.getByTestId('counter-next'))
     }
-    expect(seen).toEqual(['ANNUAL', 'OIL', 'CCL', 'PCL', 'PL', 'EL'])
+    expect(seen).toEqual(['ANNUAL', 'OIL', 'CCL', 'FCL', 'PL', 'EL'])
     // Wrapped back to the start.
     expect(screen.getByTestId('counter-name').textContent).toBe('ANNUAL')
     fireEvent.click(screen.getByTestId('counter-prev'))

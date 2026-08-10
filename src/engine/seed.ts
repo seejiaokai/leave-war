@@ -179,7 +179,7 @@ export function seedOpenings(): Openings {
     pipper: { annual: 11, oil: 1 },
     dusk: { annual: 14, oil: 2.5, ccl: 5 },
     miles: { annual: 7, oil: 6 },
-    roulette: { annual: 10, ccl: 5, pcl: 6 },
+    roulette: { annual: 10, ccl: 5, fcl: 6 },
     cross: { annual: -12, oil: 1 },
     decal: { annual: 5, oil: -4.5 },
     skin: { annual: 13, oil: 2 },

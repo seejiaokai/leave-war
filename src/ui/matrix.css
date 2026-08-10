@@ -289,7 +289,15 @@
   opacity: .75;
 }
 
-.mx tbody tr:hover td:not(.who) {
+/* `.bal` is excluded alongside `.who`, and that is a BUG FIX, not tidiness.
+   Both are frozen columns painted over the day cells, and they hold their
+   ground only because their background is opaque. This tint is translucent,
+   so a hovered row turned the counter column see-through and the grid
+   scrolled visibly underneath it — reported by the owner from a phone, where
+   a tap leaves the row hovered until something else is tapped, so the column
+   simply stays broken. `.who` was already exempt, which is why only the
+   counter showed it. Pinned by the geometry gate; jsdom cannot see it. */
+.mx tbody tr:hover td:not(.who):not(.bal) {
   background: rgba(59, 198, 232, .05);
 }
 
