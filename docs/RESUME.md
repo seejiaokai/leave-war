@@ -121,9 +121,47 @@ Then, in rough order:
   cannot yet be opened and explained.
 - **The Raptor contract document**, now that both directions are specified.
 
-Three smaller debts are in `docs/known-gaps.md`: the day verdict is computed
-and still not shown in words, `title` tooltips still do not exist on touch,
-and a cell is not reachable from the keyboard.
+Four smaller debts are in `docs/known-gaps.md`: the day verdict is computed
+and still not shown in words, `title` tooltips still do not exist on touch, a
+cell is not reachable from the keyboard, and the sheets are `role="dialog"`
+without a focus trap, focus restore or an Escape key.
+
+## Handing off
+
+Three things a new session cannot find anywhere else in this repo.
+
+**The owner reviews from a published link**, and it is the same one each time:
+
+    https://claude.ai/code/artifact/7bb0d3a7-9f47-4259-a257-524fe537bfbb
+
+That URL is bound to a **local file path**, so republishing the page from a
+different path mints a NEW url and leaves the owner refreshing a page that
+will never change. A session that did not publish it itself must pass this
+URL as the Artifact tool's `url` argument. Republish after any change worth
+their looking at — a description of a screen is not a screen.
+
+**The link is the built app inlined into one self-contained page**, because
+the host blocks every external request. Build, then put the single
+`dist/assets/*.css` into a `<style>` and the single `dist/assets/*.js` into an
+inline `<script type="module">`, escaping `</script` in the bundle; add a
+`<title>` and a `<div id="root">`, and no `<html>`, `<head>` or `<body>` tags —
+the host supplies those. It comes out around 250KB. The app paints its own
+background in `theme.css`, so the page holds on either host theme.
+
+**Raptor has not been read, and the owner has asked about it.** They gave the
+repo — `seejiaokai/Raptor`, pages at `seejiaokai.github.io/Raptor` — and were
+told, correctly, that everything said so far about the merge is this repo
+keeping its own side of the bargain: the engine is DOM-free, the only runtime
+dependencies are `react` and `react-dom`, and the palette is Raptor's own,
+copied from its `scheduler.css`. Whether the merge is a move rather than a
+rewrite cannot be answered from here.
+
+**Read it before starting the backend**, because the answers change that
+piece of work more than anything else: is Raptor React and which version, is
+it TypeScript, what build tool, what holds its state — and above all, does it
+already have a server and accounts. If it does, "shared and real time" is a
+much smaller job than starting from nothing, and it should be built against
+Raptor's rather than invented beside it.
 
 ## How this project has actually found its defects
 
