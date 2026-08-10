@@ -565,3 +565,88 @@ test('overlapping dates are refused, with the reason on screen', async ({ page }
   await expect(page.locator('[data-testid="war-sheet"]')).toBeVisible()
   await expect(page.locator('[data-testid="war-picker"] option')).toHaveCount(2)
 })
+
+// The bidding window is the answer to the owner's "the admin can select which
+// period to open" now that a war is a whole year. jsdom proves the class is
+// emitted and nothing about whether a locked column LOOKS locked, which is the
+// only thing that matters to someone holding a phone.
+test('a locked column is visibly dimmer than an open one, and still readable', async ({ page }) => {
+  const open = page.locator('[data-testid="head-2026-02-11"]')
+  const locked = page.locator('[data-testid="head-2026-08-11"]')
+  const opacity = (l: typeof open) => l.evaluate(el => Number(getComputedStyle(el).opacity))
+
+  expect(await opacity(open)).toBe(1)
+  const dim = await opacity(locked)
+  expect(dim).toBeLessThan(1)
+  // Dimmed, not hidden. Seeing the rest of the year is the entire reason the
+  // war is a year — a lock that erased October would undo that.
+  expect(dim).toBeGreaterThan(0.25)
+  await expect(locked).toBeVisible()
+  expect((await locked.boundingBox())!.width).toBeGreaterThan(0)
+})
+
+test('an admin sees no lock, because the window does not bind them', async ({ page }) => {
+  await page.locator('[data-testid="role-toggle"]').click()
+  const locked = page.locator('[data-testid="head-2026-08-11"]')
+  expect(await locked.evaluate(el => Number(getComputedStyle(el).opacity))).toBe(1)
+})
+
+// The range calendar is the control the owner asked for twice — for leave and
+// for a war's dates. Its whole justification over two native date inputs is
+// that it DRAWS the span, and only a browser can say whether it does.
+test('the range calendar paints the span between the two taps', async ({ page }) => {
+  await page.locator('[data-testid="role-toggle"]').click()
+  await page.locator('[data-testid="bid-window"]').click()
+  await expect(page.locator('[data-testid="window-sheet"]')).toBeVisible()
+
+  const bg = (d: string) => page.locator(`[data-testid="window-day-${d}"]`)
+    .evaluate(el => getComputedStyle(el).backgroundColor)
+  // Cleared first, because the sheet opens showing the window that is already
+  // set — Jan-Mar — so every January day starts painted and there would be no
+  // unpainted day left to compare against.
+  await page.locator('[data-testid="window-clear"]').click()
+  const plain = await bg('2026-01-20')
+
+  await page.locator('[data-testid="window-day-2026-01-12"]').click()
+  await page.locator('[data-testid="window-day-2026-01-16"]').click()
+
+  // Every day in the span is painted, the ends more strongly than the middle,
+  // and a day outside it is untouched.
+  const middle = await bg('2026-01-14')
+  const start = await bg('2026-01-12')
+  expect(middle).not.toBe(plain)
+  expect(start).not.toBe(middle)
+  expect(await bg('2026-01-20')).toBe(plain)
+})
+
+// The owner's complaint about the counter arrows was that they are too small
+// to hit. The calendar is the control that mistake taught, so its days and its
+// month arrows are held to a real tap target on a phone.
+test('every control in the range calendar is a real tap target', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 664 })
+  await page.locator('[data-testid="role-toggle"]').click()
+  await page.locator('[data-testid="bid-window"]').click()
+
+  for (const id of ['window-day-2026-01-12', 'window-prev-month', 'window-next-month']) {
+    const box = (await page.locator(`[data-testid="${id}"]`).boundingBox())!
+    expect(box.width).toBeGreaterThanOrEqual(30)
+    expect(box.height).toBeGreaterThanOrEqual(30)
+  }
+})
+
+// Same trap the new-war sheet fell into: `.topbar` carries `backdrop-filter`,
+// which makes it the containing block for any `position: fixed` descendant.
+// This sheet opens from the stage strip, so it has to be checked separately.
+test('the bidding-window sheet is anchored to the viewport, not clipped', async ({ page }) => {
+  await page.locator('[data-testid="role-toggle"]').click()
+  await page.locator('[data-testid="bid-window"]').click()
+  const sheet = page.locator('[data-testid="window-sheet"]')
+  await expect(sheet).toBeVisible()
+
+  const box = (await sheet.boundingBox())!
+  const view = page.viewportSize()!
+  expect(box.y).toBeGreaterThanOrEqual(0)
+  expect(box.y + box.height).toBeLessThanOrEqual(view.height + 1)
+  const bar = (await page.locator('.topbar').boundingBox())!
+  expect(box.y).toBeGreaterThan(bar.y + bar.height)
+})

@@ -5,7 +5,16 @@
 
 import { useState } from 'react'
 import { evaluatePeriod, nextStage, stageLabel } from '../engine'
-import { advanceStage, getState, selectWar, setRole } from '../state/store'
+import {
+  advanceStage,
+  clearBidWindow,
+  getState,
+  selectWar,
+  setBidWindow,
+  setRole,
+} from '../state/store'
+import { RangePicker, type Range } from './RangePicker'
+import { shortSpan } from './dates'
 import { WarSheet } from './WarSheet'
 import { useVersion } from './useStore'
 import './chrome.css'
@@ -73,8 +82,70 @@ export function Topbar() {
   )
 }
 
+/**
+ * Choose which dates the squadron may bid on.
+ *
+ * The refusals are the store's, not this sheet's: `setBidWindow` re-checks
+ * the role and the bounds because the role switch is an affordance rather
+ * than a permission, and the picker's own `min`/`max` only stop the mistake
+ * being made in the first place.
+ */
+function WindowSheet({ onClose }: { onClose: () => void }) {
+  const { period } = getState()
+  const [range, setRange] = useState<Range | null>(
+    period.bidFrom && period.bidTo ? { from: period.bidFrom, to: period.bidTo } : null,
+  )
+  const [problem, setProblem] = useState('')
+
+  const apply = () => {
+    const result = range ? setBidWindow(range.from, range.to) : clearBidWindow()
+    if (result === 'set') return onClose()
+    setProblem(
+      result === 'outside'
+        ? `Those dates leave ${period.name}, which runs ${shortSpan(period.start, period.end)}.`
+        : result === 'backwards'
+          ? 'The end date is before the start date.'
+          : 'Only an admin can open bidding.',
+    )
+  }
+
+  return (
+    <div className="bidsheet" data-testid="window-sheet" role="dialog" aria-label="Open bidding on">
+      <div className="bidsheet-hd">
+        <span className="who">OPEN BIDDING ON</span>
+        <span className="dt">{period.name}</span>
+        <button className="x" data-testid="window-cancel" onClick={onClose} aria-label="Cancel">
+          ✕
+        </button>
+      </div>
+      <div className="bidsheet-row">
+        <RangePicker
+          testid="window"
+          min={period.start}
+          max={period.end}
+          value={range}
+          onChange={setRange}
+        />
+      </div>
+      <div className="bidsheet-row">
+        <span className="lab" />
+        <button className="dchip approve" data-testid="window-apply" onClick={apply}>
+          {range ? 'Open these dates' : 'Open the whole year'}
+        </button>
+        {/* Clearing is a real choice, not a fallback: before a schedule firms
+            up at all, the whole year being open is the right state. */}
+        <span className="note">
+          The year stays on screen. Only these dates are editable by the squadron.
+        </span>
+        {problem && <span className="note warn" data-testid="window-problem">{problem}</span>}
+      </div>
+    </div>
+  )
+}
+
 export function StageBar() {
   useVersion()
+  const [picking, setPicking] = useState(false)
   const { people, period, grid, states, requirements, role } = getState()
   const dates = period.days.map(d => d.date)
   // Duplicates the same evaluatePeriod call Matrix makes internally. Both
@@ -113,6 +184,32 @@ export function StageBar() {
       >
         → {next ? stageLabel(next) : 'END OF CYCLE'}
       </button>
+      {/* Which part of the year the squadron may bid on. The war is a whole
+          year on screen and the schedule firms up a quarter at a time, so
+          this is what "the admin opens a period" means — the year stays
+          visible and this much of it is writable.
+
+          Only shown while the war is OPEN: a draft or closed war is shut to
+          the squadron on every date, and a window advertised beside "BIDDING
+          CLOSED" would contradict it. */}
+      {period.stage === 'open' && (
+        <>
+          <span className="lab" style={{ marginLeft: 12 }}>Bidding on</span>
+          <button
+            className={`fchip winchip${role === 'admin' ? ' can' : ''}`}
+            data-testid="bid-window"
+            disabled={role !== 'admin'}
+            title={role === 'admin'
+              ? 'Choose which dates the squadron may bid on'
+              : 'The dates the squadron may bid on'}
+            onClick={() => setPicking(true)}
+          >
+            {period.bidFrom && period.bidTo
+              ? shortSpan(period.bidFrom, period.bidTo)
+              : 'THE WHOLE YEAR'}
+          </button>
+        </>
+      )}
       {/* Nothing verifies this. There is no login, so switching it changes
           which controls appear and nothing else — the store is plain about
           that too. Labelled "viewing as" rather than "role" so it does not
@@ -133,6 +230,10 @@ export function StageBar() {
       <span className={`fchip${redDays > 0 ? ' undermanned' : ''}`} data-testid="undermanned">
         {redDays} day{redDays === 1 ? '' : 's'}
       </span>
+      {/* Rendered inside `.filters` rather than `.topbar`, which carries no
+          `backdrop-filter` — see the note on WarSheet in Topbar for why that
+          distinction decides where a `position: fixed` sheet actually lands. */}
+      {picking && <WindowSheet onClose={() => setPicking(false)} />}
     </div>
   )
 }

@@ -4,7 +4,9 @@
 // and is never saved.
 
 import {
+  canEditCell,
   isBiddable,
+  windowFits,
   nextStage,
   raptorOwns,
   COUNTERS,
@@ -214,11 +216,26 @@ function readWar(x: unknown): LeaveWar | null {
   if (!isPlainObject(x)) return null
   const { period, grid, states } = x
   if (!isPlainObject(period)) return null
-  const { id, name, start, end, stage, days } = period
+  const { id, name, start, end, stage, bidFrom, bidTo, days } = period
   if (typeof id !== 'string' || typeof name !== 'string') return null
   if (typeof start !== 'string' || typeof end !== 'string' || end < start) return null
   if (typeof stage !== 'string' || !STAGE_ORDER.includes(stage as Stage)) return null
   if (!Array.isArray(days)) return null
+
+  // The window is READ LENIENTLY, unlike everything else here, and the
+  // asymmetry is deliberate. A war stored before the window existed has
+  // neither key, and `undefined` there means "the whole period is open" —
+  // which is exactly how that war behaved. Rejecting it would throw away a
+  // squadron's grid over a field that did not exist when it was written.
+  // A window that is present but not a string, or backwards, or outside the
+  // period, IS rejected: that is corruption rather than an older shape.
+  const from = bidFrom == null ? null : bidFrom
+  const to = bidTo == null ? null : bidTo
+  if (from !== null && typeof from !== 'string') return null
+  if (to !== null && typeof to !== 'string') return null
+  if (from !== null && (from < start || from > end)) return null
+  if (to !== null && (to < start || to > end)) return null
+  if (from !== null && to !== null && to < from) return null
 
   const readDays: DayInfo[] = []
   for (const d of days) {
@@ -237,7 +254,11 @@ function readWar(x: unknown): LeaveWar | null {
   if (!readStatesOrNull) return null
 
   return {
-    period: { id, name, start, end, stage: stage as Stage, days: readDays },
+    period: {
+      id, name, start, end, stage: stage as Stage,
+      bidFrom: from as string | null, bidTo: to as string | null,
+      days: readDays,
+    },
     grid,
     // Same reconciliation the single-war store did: a state whose cell no
     // longer holds a bid is dropped rather than left to colour it wrong.
@@ -409,6 +430,11 @@ export function setCell(personId: string, date: string, code: string): void {
   // systems disagreeing — the single failure the source model exists to
   // prevent. Ignore rather than write, and do not notify: nothing changed.
   if (raptorOwns(state.states, personId, date)) return
+  // Stage, role AND the bidding window, in the one place a cell is written.
+  // Enforced here rather than only in the grid's click handler for the same
+  // reason `createWar` re-checks the role: the interface hides what a person
+  // may not do, but the store is what makes it true.
+  if (!canEditCell(state.period, state.role, date)) return
 
   const clean = code.trim().toUpperCase()
   const previous = state.grid[personId]?.[date]
@@ -455,6 +481,39 @@ export function setBidState(personId: string, date: string, bid: BidState): void
     [date]: { ...(existing ?? { source: 'bid' as const }), state: bid },
   }
   updateCurrent(w => ({ ...w, states: { ...w.states, [personId]: srow } }))
+}
+
+/** Why a bidding window was refused. */
+export type BidWindowResult = 'set' | 'outside' | 'backwards' | 'forbidden'
+
+/**
+ * Open bidding on a range of days inside the current war.
+ *
+ * This is what "the admin selects which period to open" means now that a war
+ * is a whole year: the year stays on screen and the squadron may write to
+ * this much of it. Admin-only, and checked here rather than trusted to a
+ * hidden button, because the role switch is an affordance rather than a
+ * permission — see `docs/known-gaps.md`.
+ *
+ * Refused rather than clamped when the range falls outside the war: an admin
+ * who typed the wrong year has made a mistake worth being told about, and
+ * silently sliding their dates to the period's edges would leave them
+ * believing they had opened something else.
+ */
+export function setBidWindow(from: string, to: string): BidWindowResult {
+  if (state.role !== 'admin') return 'forbidden'
+  if (to < from) return 'backwards'
+  if (!windowFits(state.period, from, to)) return 'outside'
+  updateCurrent(w => ({ ...w, period: { ...w.period, bidFrom: from, bidTo: to } }))
+  return 'set'
+}
+
+/** Open the whole war for bidding again — the state every war starts in and
+ *  the one every war stored before windows existed reads as. */
+export function clearBidWindow(): BidWindowResult {
+  if (state.role !== 'admin') return 'forbidden'
+  updateCurrent(w => ({ ...w, period: { ...w.period, bidFrom: null, bidTo: null } }))
+  return 'set'
 }
 
 /** Walk the period to its next stage. Forward only, and a no-op at the end

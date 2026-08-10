@@ -5,7 +5,7 @@
 // chose a cycle with stages precisely so that "why did this change after I
 // bid" always has an answer. A period that needs reopening is a new period.
 
-import type { Stage } from './period'
+import { inBidWindow, type Period, type Stage } from './period'
 
 // Frozen, and typed `readonly`, because an exported array is mutable by
 // whoever imports it: a caller who sorted or reversed it in place would
@@ -54,6 +54,26 @@ export type Role = 'member' | 'admin'
  */
 export function canEdit(stage: Stage, role: Role): boolean {
   return role === 'admin' || stage === 'open'
+}
+
+/**
+ * Whether this role may write THIS CELL — stage, role and the bidding window
+ * together.
+ *
+ * A separate function rather than a wider `canEdit`, deliberately. `canEdit`
+ * answers "is the sheet writable at all", which is what the stage strip and
+ * the role toggle ask and what four files already read; this answers "is that
+ * particular day writable", which only the grid asks. Widening the first
+ * would have made every caller pass a date it does not have.
+ *
+ * **An admin is not bound by the window.** The window exists to stop the
+ * squadron bidding on months the schedule has not reached — it is not a lock
+ * on the people running the war, who close it precisely so they can work on
+ * it without the picture moving underneath them.
+ */
+export function canEditCell(period: Period, role: Role, date: string): boolean {
+  if (!canEdit(period.stage, role)) return false
+  return role === 'admin' || inBidWindow(period, date)
 }
 
 /** Decisions are made once bidding has closed and the picture has frozen —

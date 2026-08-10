@@ -10,6 +10,8 @@ import {
   createWar,
   selectWar,
   setRole,
+  setBidWindow,
+  clearBidWindow,
   shiftBid,
   subscribe,
 } from './store'
@@ -771,7 +773,15 @@ describe('more than one leave war', () => {
 
   // Writes land in the war on screen and nowhere else. A cell written while
   // looking at Apr–Jun must not appear in Jan–Mar.
+  // Admin, and that is not incidental. This test used to pass as a MEMBER
+  // writing into a DRAFT war, because `setCell` checked neither stage nor
+  // role — the edit lock lived only in the grid's click handler, so anything
+  // calling the store directly walked straight past it. Adding the bidding
+  // window put all three checks in the store and this test went red, which is
+  // the tightening working rather than the test being wrong. Its own subject
+  // — that a write lands in the war on screen — is unchanged.
   it('writes into the war on screen, leaving the others untouched', () => {
+    setRole('admin')
     const [q1, q2] = getState().wars.map(w => w.period.id)
     selectWar(q2)
     setCell('dusk', '2027-04-20', 'LL')
@@ -944,5 +954,122 @@ describe('reading stored wars', () => {
     expect(blocked.blocked).toBe(true)
     expect(blocked.blockedReason).toBe('Exercise week')
     expect(getState().period.days.find(d => d.date === '2026-01-01')!.ph).toBe(true)
+  })
+})
+
+describe('the bidding window', () => {
+  beforeEach(() => {
+    initStore(memoryBackend())
+  })
+
+  // The seed opens the year on its first quarter, so the window is real from
+  // the first screen rather than a feature nobody can see until they set one.
+  it('seeds the current war with bidding open on the first quarter', () => {
+    expect(getState().period.bidFrom).toBe('2026-01-01')
+    expect(getState().period.bidTo).toBe('2026-03-31')
+  })
+
+  it('lets a member write inside the window', () => {
+    setCell('ramp', '2026-02-11', 'LL')
+    expect(getState().grid.ramp['2026-02-11']).toBe('LL')
+  })
+
+  // The store is what makes the lock true. The grid hides an unopenable cell,
+  // but anything calling the store directly — a keyboard path, a future sync,
+  // a test — has to hit the same wall.
+  it('refuses a member writing outside the window, silently and without a version bump', () => {
+    const before = getVersion()
+    setCell('ramp', '2026-08-11', 'LL')
+    expect(getState().grid.ramp?.['2026-08-11']).toBeUndefined()
+    expect(getVersion()).toBe(before)
+  })
+
+  it('lets an admin write outside the window', () => {
+    setRole('admin')
+    setCell('ramp', '2026-08-11', 'LL')
+    expect(getState().grid.ramp['2026-08-11']).toBe('LL')
+  })
+
+  it('moves the window, and the member follows it', () => {
+    setRole('admin')
+    expect(setBidWindow('2026-07-01', '2026-09-30')).toBe('set')
+    setRole('member')
+    setCell('ramp', '2026-08-11', 'LL')
+    expect(getState().grid.ramp['2026-08-11']).toBe('LL')
+    setCell('ramp', '2026-02-11', 'OL')
+    expect(getState().grid.ramp?.['2026-02-11']).toBeUndefined()
+  })
+
+  it('refuses a window a member tries to set', () => {
+    expect(setBidWindow('2026-07-01', '2026-09-30')).toBe('forbidden')
+    expect(getState().period.bidFrom).toBe('2026-01-01')
+  })
+
+  it('refuses a window that leaves the war, and one that runs backwards', () => {
+    setRole('admin')
+    expect(setBidWindow('2025-12-01', '2026-03-31')).toBe('outside')
+    expect(setBidWindow('2026-11-01', '2027-02-01')).toBe('outside')
+    expect(setBidWindow('2026-09-30', '2026-07-01')).toBe('backwards')
+    // Refused means UNCHANGED, not partly applied.
+    expect(getState().period.bidFrom).toBe('2026-01-01')
+    expect(getState().period.bidTo).toBe('2026-03-31')
+  })
+
+  it('clears the window, opening the whole war again', () => {
+    setRole('admin')
+    expect(clearBidWindow()).toBe('set')
+    setRole('member')
+    setCell('ramp', '2026-08-11', 'LL')
+    expect(getState().grid.ramp['2026-08-11']).toBe('LL')
+  })
+
+  it('belongs to the war, not to the app', () => {
+    setRole('admin')
+    setBidWindow('2026-07-01', '2026-09-30')
+    const [, y27] = getState().wars.map(w => w.period.id)
+    selectWar(y27)
+    expect(getState().period.bidFrom).toBeNull()
+    expect(getState().wars[0].period.bidFrom).toBe('2026-07-01')
+  })
+
+  it('survives a reload', () => {
+    const backend = memoryBackend()
+    initStore(backend)
+    setRole('admin')
+    setBidWindow('2026-07-01', '2026-09-30')
+    initStore(backend)
+    expect(getState().period.bidFrom).toBe('2026-07-01')
+    expect(getState().period.bidTo).toBe('2026-09-30')
+  })
+
+  // A war written before the window existed has neither key. Reading it as
+  // "the whole period is open" is what that war actually did, and rejecting
+  // it would throw away a squadron's grid over a field that did not exist
+  // when it was saved. Everything else in this loader degrades to the seed;
+  // this one field is deliberately lenient, so it gets its own test.
+  it('reads a stored war with no window at all as fully open', () => {
+    const backend = memoryBackend()
+    const war = makeWar('old', 'OLD', '2026-01-01', '2026-12-31')
+    const { bidFrom: _f, bidTo: _t, ...periodWithoutWindow } = war.period
+    backend.write('wars', JSON.stringify([{ ...war, period: { ...periodWithoutWindow, stage: 'open' } }]))
+    backend.write('current', JSON.stringify('old'))
+    initStore(backend)
+
+    expect(getState().period.id).toBe('old')
+    expect(getState().period.bidFrom).toBeNull()
+    setCell('ramp', '2026-08-11', 'LL')
+    expect(getState().grid.ramp['2026-08-11']).toBe('LL')
+  })
+
+  // Present but nonsense is corruption, not an older shape, and falls back to
+  // the seed like every other malformed field here.
+  it('rejects a stored window that leaves its own war', () => {
+    const backend = memoryBackend()
+    const war = makeWar('bad', 'BAD', '2026-01-01', '2026-12-31')
+    war.period.bidFrom = '2025-01-01'
+    backend.write('wars', JSON.stringify([war]))
+    backend.write('current', JSON.stringify('bad'))
+    initStore(backend)
+    expect(getState().wars.map(w => w.period.id)).toEqual(['y2026', 'y2027'])
   })
 })

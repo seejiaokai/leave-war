@@ -1,0 +1,135 @@
+/* The range calendar. Sits inside a `.bidsheet`, so it inherits that sheet's
+   ground and only paints what is its own. */
+
+.rpick {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  max-width: 320px;
+}
+
+.rpick-hd {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.rmon {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .1em;
+  color: var(--ink-2);
+}
+
+/* 34px, not the 13px the grid's own arrows use. The owner's note was that
+   the counter arrows are too small to hit on a phone; these are the same
+   class of control and get the size that mistake taught. */
+.rnav {
+  background: var(--panel-2);
+  border: 1px solid var(--edge);
+  color: var(--ink-2);
+  border-radius: 8px;
+  width: 34px;
+  height: 34px;
+  font-size: 17px;
+  line-height: 1;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.rnav:hover {
+  border-color: rgba(59, 198, 232, .5);
+  color: var(--accent);
+}
+
+.rpick-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 3px;
+}
+
+.rdow {
+  text-align: center;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  color: var(--ink-3);
+  padding-bottom: 2px;
+}
+
+.rblank {
+  /* Occupies its cell and paints nothing — the 1st has to land under the
+     right weekday or every date in the month reads one column out. */
+}
+
+/* 36px square. A tap target, not a glyph: this is the control the owner will
+   use to ask for a fortnight of leave on a phone. */
+.rday {
+  background: var(--panel-2);
+  border: 1px solid var(--edge);
+  color: var(--ink-2);
+  border-radius: 7px;
+  height: 36px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  padding: 0;
+}
+
+.rday.wknd {
+  background: #0D1014;
+  color: var(--ink-3);
+}
+
+.rday:disabled {
+  opacity: .3;
+  cursor: default;
+}
+
+.rday:hover:not(:disabled) {
+  border-color: rgba(59, 198, 232, .5);
+}
+
+/* The span itself: a filled run, with its two ends stated more strongly than
+   its middle. Seeing the whole range at once is the entire reason this is not
+   two native date inputs. */
+.rday.on {
+  background: rgba(59, 198, 232, .18);
+  border-color: rgba(59, 198, 232, .45);
+  color: var(--ink);
+}
+
+.rday.start,
+.rday.end {
+  background: rgba(59, 198, 232, .34);
+  border-color: var(--accent);
+  color: #EAF9FE;
+}
+
+.rpick-ft {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.rsel {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: .04em;
+}
+
+.rclear {
+  background: none;
+  border: 1px solid var(--edge);
+  color: var(--ink-3);
+  border-radius: 7px;
+  padding: 5px 10px;
+  font-size: 10px;
+  cursor: pointer;
+  font-family: inherit;
+}

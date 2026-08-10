@@ -78,7 +78,22 @@ export function seedPeriod(): Period {
       d.events[0] = 'PH'
     }
   }
-  return { id: 'y2026', name: 'JAN - DEC 26', start: '2026-01-01', end: '2026-12-31', stage: 'open', days }
+  // Open, with bidding on the FIRST QUARTER only. That combination is the
+  // whole point of the window and is why it is seeded rather than left null:
+  // the squadron reads the entire year, and can bid on the part of it the
+  // schedule has actually reached. Jan–Mar because every seeded bid sits in
+  // January and February, so the demonstration costs no seed data — and Apr
+  // onwards is visibly locked from the first screen.
+  return {
+    id: 'y2026',
+    name: 'JAN - DEC 26',
+    start: '2026-01-01',
+    end: '2026-12-31',
+    stage: 'open',
+    bidFrom: '2026-01-01',
+    bidTo: '2026-03-31',
+    days,
+  }
 }
 
 export function seedRequirements(): Requirements {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { Stage } from './period'
-import { canDecide, canEdit, nextStage, stageLabel, STAGE_ORDER } from './stages'
+import { windowFits, type Period, type Stage } from './period'
+import { canDecide, canEdit, canEditCell, nextStage, stageLabel, STAGE_ORDER } from './stages'
 
 describe('stage transitions', () => {
   it('runs draft to open to closed to published', () => {
@@ -70,5 +70,94 @@ describe('what each stage allows', () => {
   it('makes the roles differ exactly where the lock matters', () => {
     const differs = STAGE_ORDER.filter(s => canEdit(s, 'admin') !== canEdit(s, 'member'))
     expect(differs).toEqual(['draft', 'closed', 'published'])
+  })
+})
+
+describe('canEditCell — stage, role and the bidding window together', () => {
+  const year = (bidFrom: string | null, bidTo: string | null, stage: Stage = 'open'): Period => ({
+    id: 'y', name: 'JAN - DEC 26',
+    start: '2026-01-01', end: '2026-12-31',
+    stage, bidFrom, bidTo, days: [],
+  })
+
+  // The whole point of the window. The year is on screen; the squadron may
+  // write to the part of it the schedule has actually reached.
+  it('lets a member write inside the window and not outside it', () => {
+    const p = year('2026-07-01', '2026-09-30')
+    expect(canEditCell(p, 'member', '2026-07-01')).toBe(true)
+    expect(canEditCell(p, 'member', '2026-08-15')).toBe(true)
+    expect(canEditCell(p, 'member', '2026-09-30')).toBe(true)
+    expect(canEditCell(p, 'member', '2026-06-30')).toBe(false)
+    expect(canEditCell(p, 'member', '2026-10-01')).toBe(false)
+  })
+
+  // Both bounds are INCLUSIVE, and an off-by-one here would silently cost the
+  // squadron the first and last day of every window they were told was open.
+  it('includes both end dates', () => {
+    const p = year('2026-07-01', '2026-09-30')
+    expect(canEditCell(p, 'member', '2026-07-01')).toBe(true)
+    expect(canEditCell(p, 'member', '2026-09-30')).toBe(true)
+  })
+
+  // A war stored before windows existed carries neither bound, and it must go
+  // on behaving exactly as it did — open everywhere the stage allows.
+  it('opens the whole war when no window is set', () => {
+    const p = year(null, null)
+    for (const d of ['2026-01-01', '2026-06-15', '2026-12-31']) {
+      expect(canEditCell(p, 'member', d)).toBe(true)
+    }
+  })
+
+  // Half a window is still a window: an open end means "from here on".
+  it('honours a one-ended window', () => {
+    expect(canEditCell(year('2026-07-01', null), 'member', '2026-06-30')).toBe(false)
+    expect(canEditCell(year('2026-07-01', null), 'member', '2026-12-31')).toBe(true)
+    expect(canEditCell(year(null, '2026-09-30'), 'member', '2026-10-01')).toBe(false)
+    expect(canEditCell(year(null, '2026-09-30'), 'member', '2026-01-01')).toBe(true)
+  })
+
+  // The window holds the SQUADRON to the part of the year the schedule has
+  // reached. It is not a lock on the people running the war — they close a
+  // war precisely so they can work on it without the picture moving.
+  it('does not bind an admin', () => {
+    const p = year('2026-07-01', '2026-09-30')
+    for (const d of ['2026-01-01', '2026-08-15', '2026-12-31']) {
+      expect(canEditCell(p, 'admin', d)).toBe(true)
+    }
+  })
+
+  // The window never OVERRIDES the stage. A closed war is closed to the
+  // squadron on every date, window or no window — otherwise closing bidding
+  // would stop meaning anything as long as a window was left set.
+  it('never opens a date the stage has closed', () => {
+    for (const stage of ['draft', 'closed', 'published'] as Stage[]) {
+      const p = year('2026-07-01', '2026-09-30', stage)
+      expect(canEditCell(p, 'member', '2026-08-15')).toBe(false)
+    }
+  })
+})
+
+describe('windowFits', () => {
+  const p: Period = {
+    id: 'y', name: 'JAN - DEC 26', start: '2026-01-01', end: '2026-12-31',
+    stage: 'open', bidFrom: null, bidTo: null, days: [],
+  }
+
+  it('accepts a range inside the war, including its very edges', () => {
+    expect(windowFits(p, '2026-07-01', '2026-09-30')).toBe(true)
+    expect(windowFits(p, '2026-01-01', '2026-12-31')).toBe(true)
+    expect(windowFits(p, '2026-05-04', '2026-05-04')).toBe(true)
+  })
+
+  // Refused rather than clamped: an admin who typed the wrong year has made a
+  // mistake worth being told about, and sliding their dates to the period's
+  // edges would leave them believing they opened something else.
+  it('refuses a range that leaves the war at either end', () => {
+    expect(windowFits(p, '2025-12-31', '2026-03-31')).toBe(false)
+    expect(windowFits(p, '2026-10-01', '2027-01-01')).toBe(false)
+  })
+
+  it('refuses a backwards range', () => {
+    expect(windowFits(p, '2026-09-30', '2026-07-01')).toBe(false)
   })
 })

@@ -256,3 +256,20 @@
   border-color: rgba(59, 198, 232, .5);
   color: var(--accent);
 }
+
+/* The bidding-window chip. Reads as a value when a member looks at it and as
+   a control when an admin does — same chip, because it is the same fact and
+   only one of them can change it. */
+.winchip.can {
+  cursor: pointer;
+  border-color: rgba(59, 198, 232, .45);
+  color: var(--accent);
+}
+
+.winchip.can:hover {
+  background: rgba(59, 198, 232, .12);
+}
+
+.winchip:disabled {
+  cursor: default;
+}

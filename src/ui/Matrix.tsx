@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import {
   balanceOf,
   canDecide,
-  canEdit,
+  canEditCell,
   categoryOf,
   evaluatePeriod,
   inSquadron,
@@ -77,7 +77,10 @@ export function Matrix() {
     wrap.scrollLeft += cell.getBoundingClientRect().left - wrap.getBoundingClientRect().left - frozen
   }
 
-  const editing = canEdit(period.stage, role)
+  // Every "may this be written" question now goes through `canEditCell`,
+  // which folds the stage, the role and the bidding window into one answer
+  // for one date. `canEdit` is what the stage strip and the role toggle ask —
+  // "is the sheet writable at all" — and has no date to narrow itself with.
   const deciding = canDecide(period.stage, role)
 
   // Which sheet a click opens follows from three things: the stage, the role,
@@ -92,8 +95,14 @@ export function Matrix() {
   // empty cell are all things nobody asked for.
   const openable = (personId: string, date: string): boolean =>
     raptorOwns(states, personId, date) ||
-    editing ||
+    canEditCell(period, role, date) ||
     (deciding && isBiddable(grid[personId]?.[date]))
+
+  // A day the squadron may not bid on, drawn as such. Without this the window
+  // is invisible: a member taps an October cell, nothing happens, and the app
+  // reads as broken rather than as closed. Admin sees no lock — the window
+  // does not bind them, so drawing one would be a lie about their own screen.
+  const lockedDate = (date: string): boolean => !canEditCell(period, role, date)
 
   return (
     <div className="stage">
@@ -151,7 +160,7 @@ export function Matrix() {
                     <th
                       key={d.date}
                       data-testid={`head-${d.date}`}
-                      className={`day${d.blocked ? ' blocked' : ''}${isWeekend(d.date) ? ' weekend' : ''}`}
+                      className={`day${d.blocked ? ' blocked' : ''}${isWeekend(d.date) ? ' weekend' : ''}${lockedDate(d.date) ? ' locked' : ''}`}
                       title={[d.blocked ? d.blockedReason : '', d.events.filter(Boolean).join(' / ')]
                         .filter(Boolean)
                         .join(' — ')}
@@ -210,6 +219,11 @@ export function Matrix() {
                       // weekend rule so a posted-out weekend still reads as
                       // posted out.
                       isWeekend(d.date) ? 'weekend' : '',
+                      // Outside the bidding window, for this role. Declared
+                      // after the weekend so a locked Saturday still reads as
+                      // locked — the same cascade care the .blocked/.weekend
+                      // pair needs, and for the same reason.
+                      lockedDate(d.date) ? 'locked' : '',
                     ].filter(Boolean).join(' ')
                     const text = here ? code : notYetArrived ? '' : 'PO'
                     // Duty first for the reader — FS/HS are work, not a bid.
@@ -301,7 +315,8 @@ export function Matrix() {
           wins on a cell that holds a bid, because that is what the stage is
           for; the picker still opens on an empty one, so an admin can add
           leave to a closed sheet without a second control. */}
-      {open && !raptorOwns(states, open.id, open.date) && editing
+      {open && !raptorOwns(states, open.id, open.date)
+        && canEditCell(period, role, open.date)
         && !(deciding && isBiddable(grid[open.id]?.[open.date])) && (
         <BidPicker
           key={`${open.id}-${open.date}`}

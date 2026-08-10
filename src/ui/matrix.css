@@ -333,6 +333,30 @@
   padding-left: 2px;
 }
 
+/* Outside the bidding window: not editable by whoever is looking.
+   Deliberately QUIET — a dimmed column that reads as "not yours to touch
+   yet", not an alarm. The whole year stays legible, because seeing the rest
+   of the year is the reason the war is a year in the first place; this only
+   says which part of it is being bid on right now.
+
+   Declared after .weekend and .blocked so a locked weekend and a locked
+   exercise week still read as locked. Same cascade care those two already
+   needed — see the note above .blocked. */
+.mx thead th.locked {
+  opacity: .45;
+}
+
+.mx td.locked {
+  opacity: .5;
+}
+
+/* The frozen columns are never locked — they are not dates — but a locked
+   day cell must not fade its own hatch away to nothing on a posted-out row,
+   or "gone" and "locked" become indistinguishable. */
+.mx td.locked.gone {
+  opacity: .65;
+}
+
 /* ---- phone breakpoint ----
 
    The balance column has to be PAID for, not added on top. Below this width

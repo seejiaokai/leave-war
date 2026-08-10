@@ -35,7 +35,7 @@ export function makeWar(id: string, name: string, start: string, end: string): L
     throw new Error(`makeWar: '${name}' ends (${end}) before it starts (${start})`)
   }
   return {
-    period: { id, name, start, end, stage: 'draft', days: buildDays(start, end) },
+    period: { id, name, start, end, stage: 'draft', bidFrom: null, bidTo: null, days: buildDays(start, end) },
     grid: {},
     states: {},
   }
