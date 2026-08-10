@@ -18,15 +18,11 @@
   border-radius: var(--r);
   box-shadow: 0 18px 48px rgba(0, 0, 0, .55);
   padding: 10px 12px 12px;
-  /* A sheet holding a month calendar is roughly 500px tall. Bounded and
-     scrolled INSIDE rather than allowed to grow off the top of the screen,
-     where the header naming whose leave it is would be the first thing lost.
-
-     BELT AND BRACES, not tested — said plainly because this repo does not
-     dress guards up. The gate asserts every sheet sits wholly inside the
-     viewport, and deleting these two lines does not break it: the tallest
-     sheet today is ~500px against a 664px phone, so nothing yet overflows.
-     It is here for the sheet that eventually does. */
+  /* A sheet holding a month calendar is roughly 500px tall, which no longer
+     fits above the bottom margin on a phone. Bounded and scrolled INSIDE
+     rather than allowed to grow off the top of the screen, where the header
+     naming whose leave it is would be the first thing lost. The geometry
+     gate pins this: every sheet must sit wholly inside the viewport. */
   max-height: calc(100vh - 28px);
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
@@ -202,4 +198,61 @@
 .bidsheet .namein {
   flex: 1 1 200px;
   min-width: 140px;
+}
+
+/* ---- the counter sheet ----
+
+   Full-width rows, because the control this replaces was two 13px arrows in
+   a 44px column and the owner could not hit them on a phone. 44px tall is
+   the figure every touch guideline lands on, and the geometry gate asserts
+   it rather than trusting the number written here. */
+.clist {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.crow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 14px;
+  background: var(--panel-2);
+  border: 1px solid var(--edge);
+  border-radius: 10px;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+}
+
+.crow:hover {
+  border-color: rgba(59, 198, 232, .5);
+}
+
+.crow.on {
+  background: rgba(59, 198, 232, .14);
+  border-color: var(--accent);
+}
+
+.crow .cn {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: .1em;
+  color: var(--ink);
+}
+
+/* The squadron-wide figure beside each name. It is what makes the list
+   answerable: "which counter" is a question people settle by looking for the
+   one that is running out. Tabular so the six line up as a column. */
+.crow .ct {
+  font-size: 11px;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.crow .ct.neg {
+  color: #FFAAB0;
 }

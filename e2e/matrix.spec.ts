@@ -5,6 +5,26 @@ const CAL_MONTHS = [
   'JULY', 'AUGUST', 'SEPTEMBER', 'OCTOBER', 'NOVEMBER', 'DECEMBER',
 ]
 
+/** Choose a counter through the sheet. The whole column header is the
+ *  control — the two arrows it replaced were 13px glyphs the owner could not
+ *  hit on a phone. */
+async function pickCounter(page: Page, counter: string) {
+  await page.locator('[data-testid="counter-pick"]').click()
+  await page.locator(`[data-testid="counter-${counter}"]`).click()
+}
+
+/** A horizontal swipe, dispatched as real `Touch` objects. Playwright's
+ *  `touchscreen` taps but cannot drag, and `TouchEventInit` rejects plain
+ *  objects — it needs actual `Touch` instances. */
+async function swipe(page: Page, from: { x: number; y: number }, dx: number) {
+  await page.evaluate(([x, y, delta]) => {
+    const el = document.elementFromPoint(x, y)!
+    const at = (cx: number) => [new Touch({ identifier: 1, target: el, clientX: cx, clientY: y })]
+    el.dispatchEvent(new TouchEvent('touchstart', { bubbles: true, touches: at(x) }))
+    el.dispatchEvent(new TouchEvent('touchend', { bubbles: true, changedTouches: at(x + delta) }))
+  }, [from.x, from.y, dx])
+}
+
 /** Drive a range calendar to a span the way a person does — walk to the
  *  month, tap the start, walk on, tap the end. */
 async function pickSpan(page: Page, testid: string, from: string, to: string) {
@@ -508,7 +528,7 @@ test('the counter column changes every row at once', async ({ page }) => {
   const rows = ['ramp', 'tata', 'jaguar', 'dusk']
   const before = await Promise.all(rows.map(r => page.locator(`[data-testid="bal-${r}"]`).textContent()))
 
-  await page.locator('[data-testid="counter-next"]').click()
+  await pickCounter(page, 'oil')
   await expect(page.locator('[data-testid="counter-name"]')).toHaveText('OIL')
 
   const after = await Promise.all(rows.map(r => page.locator(`[data-testid="bal-${r}"]`).textContent()))
@@ -519,7 +539,7 @@ test('the counter column changes every row at once', async ({ page }) => {
 
 test('a negative balance is painted red, and a positive one is not', async ({ page }) => {
   // DECAL's OIL opens at -4.5 and nothing in the seed moves it.
-  await page.locator('[data-testid="counter-next"]').click()
+  await pickCounter(page, 'oil')
   await expect(page.locator('[data-testid="counter-name"]')).toHaveText('OIL')
   const neg = await page.locator('[data-testid="bal-decal"]').evaluate(el => ({
     text: el.textContent, colour: getComputedStyle(el).color,
@@ -829,4 +849,83 @@ test('every date column names its weekday', async ({ page }) => {
   const size = await page.locator('[data-testid="head-2026-01-05"] .dow')
     .evaluate(el => parseFloat(getComputedStyle(el).fontSize))
   expect(size).toBeGreaterThanOrEqual(8)
+})
+
+// The owner's complaint: "The left and right buttons on the phone to toggle
+// the view for the leave counter is too small." They were — two 13px glyphs
+// inside a 44px column. This is the size question, and only a browser can
+// answer it.
+test('the counter control is a real tap target on a phone', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 760 })
+  const head = (await page.locator('[data-testid="counter-pick"]').boundingBox())!
+  // The whole column header is the button now, so it is as wide as the
+  // column and tall enough to hit without aiming.
+  expect(head.width).toBeGreaterThanOrEqual(36)
+  expect(head.height).toBeGreaterThanOrEqual(36)
+
+  await page.locator('[data-testid="counter-pick"]').click()
+  await expect(page.locator('[data-testid="counter-sheet"]')).toBeVisible()
+  // And every row in the sheet clears the 44px a thumb needs.
+  for (const c of ['annual', 'oil', 'el']) {
+    const row = (await page.locator(`[data-testid="counter-${c}"]`).boundingBox())!
+    expect(row.height).toBeGreaterThanOrEqual(44)
+    expect(row.width).toBeGreaterThanOrEqual(240)
+  }
+})
+
+test('the counter sheet changes the column, and every row with it', async ({ page }) => {
+  const shown = () => page.locator('[data-testid="counter-name"]').textContent()
+  expect(await shown()).toBe('ANNUAL')
+  const before = await page.locator('[data-testid="bal-ramp"]').textContent()
+
+  await page.locator('[data-testid="counter-pick"]').click()
+  await page.locator('[data-testid="counter-oil"]').click()
+
+  expect(await shown()).toBe('OIL')
+  await expect(page.locator('[data-testid="counter-sheet"]')).toHaveCount(0)
+  expect(await page.locator('[data-testid="bal-ramp"]').textContent()).not.toBe(before)
+})
+
+// The fast path beside the sheet's guaranteed one. Touch emulation is only
+// available on the phone project, so this is skipped elsewhere rather than
+// pretended.
+test('swiping across the counter column cycles it', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'phone', 'needs touch emulation')
+  const shown = () => page.locator('[data-testid="counter-name"]').textContent()
+  expect(await shown()).toBe('ANNUAL')
+
+  const bal = (await page.locator('[data-testid="bal-ramp"]').boundingBox())!
+  const at = { x: bal.x + bal.width / 2, y: bal.y + bal.height / 2 }
+
+  // Right to left is "next", the direction a page turns.
+  await swipe(page, at, -90)
+  expect(await shown()).toBe('OIL')
+  await swipe(page, at, 90)
+  expect(await shown()).toBe('ANNUAL')
+})
+
+// Short and vertical drags must NOT cycle it, or the counter would flip
+// whenever somebody scrolled the rows under their thumb.
+test('a small or vertical drag on the counter column changes nothing', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'phone', 'needs touch emulation')
+  const bal = (await page.locator('[data-testid="bal-ramp"]').boundingBox())!
+  const at = { x: bal.x + bal.width / 2, y: bal.y + bal.height / 2 }
+  await swipe(page, at, -20)
+  expect(await page.locator('[data-testid="counter-name"]').textContent()).toBe('ANNUAL')
+})
+
+// A swipe that starts anywhere else must go on scrolling the grid. A counter
+// that flipped whenever someone dragged the year sideways would be worse than
+// no swipe at all.
+test('swiping the day columns leaves the counter alone', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'phone', 'needs touch emulation')
+  // A day column that is actually ON SCREEN at 390px. The 15th sits ~736px
+  // along an unscrolled year, so `elementFromPoint` would land on whatever
+  // is at that coordinate in the viewport — which is the frozen counter
+  // column, and the test would then be swiping the very thing it means to
+  // avoid. Found by this test failing for that reason.
+  const cell = (await page.locator('[data-testid="cell-ramp-2026-01-03"]').boundingBox())!
+  expect(cell.x).toBeLessThan(390)
+  await swipe(page, { x: cell.x + cell.width / 2, y: cell.y + cell.height / 2 }, -120)
+  expect(await page.locator('[data-testid="counter-name"]').textContent()).toBe('ANNUAL')
 })

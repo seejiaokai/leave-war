@@ -14,7 +14,7 @@
 // rather than against a signed-in person — see `docs/known-gaps.md`.
 
 import { useState } from 'react'
-import { formatCell, LEAVE_TYPES, type BidState, type Portion } from '../engine'
+import { addDays, formatCell, LEAVE_TYPES, type BidState, type CounterName, type Portion } from '../engine'
 import { setBidState, setCell, setCellRange, shiftBid } from '../state/store'
 import { RangePicker, type Range } from './RangePicker'
 import { shortSpan } from './dates'
@@ -32,6 +32,8 @@ export function BidPicker({
   date,
   current,
   dates,
+  onWrote,
+  wouldLeave,
   onClose,
 }: {
   callsign: string
@@ -41,6 +43,14 @@ export function BidPicker({
   /** Every date in the war, used only for the range picker's bounds so a
    *  fortnight cannot run off the end of the sheet it belongs to. */
   dates: string[]
+  /** Told what was written, so the counter column can follow the leave just
+   *  entered. Reported rather than set here: the selection belongs to the
+   *  matrix, which is the only thing that can keep every row in step. */
+  onWrote?: (code: string) => void
+  /** What the balance would read after this write, or `null` for leave that
+   *  spends nothing. Supplied by the matrix, where the wars, openings and
+   *  ledger already are. */
+  wouldLeave?: (code: string, days: number) => { counter: CounterName; after: number } | null
   onClose: () => void
 }) {
   // Deliberately not seeded from `current`: the portion resets to a whole
@@ -52,10 +62,38 @@ export function BidPicker({
   const [range, setRange] = useState<Range | null>(null)
   const [showCal, setShowCal] = useState(false)
   const [note, setNote] = useState('')
+  // Which code the sheet has warned about. A second tap on the SAME leave is
+  // the confirmation — a separate "are you sure" button would be a second
+  // control to find on a phone, and tapping the thing you already meant to
+  // tap is the least surprising way to say yes.
+  const [confirming, setConfirming] = useState<string | null>(null)
+
+  /** Days this write covers — one, or the span if a range is chosen. */
+  const dayCount = () => {
+    if (!range) return 1
+    let n = 0
+    for (let d = range.from; d <= range.to; d = addDays(d, 1)) n++
+    return n
+  }
 
   const write = (code: string) => {
+    // Ask before taking someone below zero. Never REFUSE: the squadron's own
+    // workbook runs negative and the owner was explicit that it must stay
+    // possible — annual at −14, OIL at −5.5. What was wrong was doing it
+    // silently, so this is a confirmation, not a rule.
+    const after = code && wouldLeave ? wouldLeave(code, dayCount()) : null
+    if (after && after.after < 0 && confirming !== code) {
+      setConfirming(code)
+      return setNote(
+        `That takes ${callsign} to ${after.after} ${after.counter.toUpperCase()}. ` +
+        'Tap the same leave again to go ahead.',
+      )
+    }
+    setConfirming(null)
+
     if (!range) {
       setCell(personId, date, code)
+      onWrote?.(code)
       return onClose()
     }
     // A range that crosses a locked day, a Raptor cell or a posting-out date
@@ -63,6 +101,7 @@ export function BidPicker({
     // would make a fortnight that happens to include one such day impossible
     // to ask for at all.
     const { written, skipped } = setCellRange(personId, range.from, range.to, code)
+    if (written > 0) onWrote?.(code)
     if (skipped === 0) return onClose()
     setNote(
       written === 0

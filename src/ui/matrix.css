@@ -93,19 +93,49 @@
   color: var(--accent);
 }
 
-.mx thead th.bal .cnav {
+/* The whole header is the button. It was two 13px arrows either side of the
+   label, and the owner's verdict from a phone was that they are too small to
+   hit — which they were: a glyph in a 44px column is not a tap target, and no
+   padding makes it one without eating the column it sits in.
+
+   So the target became the entire header cell, and the choosing moved out to
+   a sheet. */
+.mx thead th.bal .cpick {
+  display: block;
+  width: 100%;
+  min-height: 40px;
   background: none;
   border: none;
-  color: var(--ink-3);
+  color: inherit;
   cursor: pointer;
-  font-size: 13px;
-  line-height: 1;
-  padding: 0 3px;
+  padding: 2px 1px;
   font-family: inherit;
 }
 
-.mx thead th.bal .cnav:hover {
-  color: var(--accent);
+.mx thead th.bal .cpick:hover .cname {
+  color: #8FE2F5;
+}
+
+/* Six dots under the label, one lit. Two jobs at once and both needed: it
+   says there are more counters than the one on screen — which the arrows used
+   to say — and it says where in the six this one sits, which they never did.
+   3px each, so the whole strip costs less width than one old arrow. */
+.mx thead th.bal .cdots {
+  display: flex;
+  gap: 2px;
+  justify-content: center;
+  margin-top: 2px;
+}
+
+.mx thead th.bal .cdot {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--edge-2);
+}
+
+.mx thead th.bal .cdot.on {
+  background: var(--accent);
 }
 
 /* The counts' own balance cell is deliberately blank — a rule has no leave —

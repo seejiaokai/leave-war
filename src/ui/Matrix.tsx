@@ -1,9 +1,10 @@
-import { useRef, useState } from 'react'
+import { useRef, useState, type TouchEvent } from 'react'
 import {
   balanceOf,
   canDecide,
   canEditCell,
   categoryOf,
+  codeOf,
   evaluatePeriod,
   inSquadron,
   isBiddable,
@@ -20,6 +21,7 @@ import {
 } from '../engine'
 import { getState } from '../state/store'
 import { BidPicker, DecisionSheet, RaptorSheet } from './BidPicker'
+import { CounterSheet } from './CounterSheet'
 import { CountRows } from './CountRows'
 import { useVersion } from './useStore'
 import './matrix.css'
@@ -55,8 +57,31 @@ export function Matrix() {
   // scroller would let them desync — row 1 showing ANNUAL while row 2 shows
   // OIL — which is worse than no panel at all.
   const [counter, setCounter] = useState(0)
+  const [picking, setPicking] = useState(false)
   const shown = COUNTERS[counter]
   const cycle = (by: number) => setCounter(c => (c + by + COUNTERS.length) % COUNTERS.length)
+
+  // Swipe across the counter column to cycle it — the fast path, beside the
+  // sheet's guaranteed one. Bound on the wrapper rather than on each cell so
+  // one pair of listeners covers a column of twenty-odd, and filtered to
+  // touches that START on a `.bal` cell so a swipe anywhere else still
+  // scrolls the grid, which is what a horizontal drag must go on doing.
+  const swipe = useRef<{ x: number; y: number } | null>(null)
+  const onTouchStart = (e: TouchEvent) => {
+    const on = (e.target as HTMLElement).closest?.('.bal')
+    swipe.current = on ? { x: e.touches[0].clientX, y: e.touches[0].clientY } : null
+  }
+  const onTouchEnd = (e: TouchEvent) => {
+    const from = swipe.current
+    swipe.current = null
+    if (!from) return
+    const dx = e.changedTouches[0].clientX - from.x
+    const dy = e.changedTouches[0].clientY - from.y
+    // Horizontal, and decisively so: 40px across and more sideways than up,
+    // or every scroll of the rows would flip the counter under the thumb.
+    if (Math.abs(dx) < 40 || Math.abs(dx) < Math.abs(dy)) return
+    cycle(dx < 0 ? 1 : -1)
+  }
 
   // Jumping to a month is how a year-long war is navigable at all: 365
   // columns is roughly 13,600px, and nobody finds September by dragging.
@@ -126,7 +151,12 @@ export function Matrix() {
             ))}
           </div>
         </div>
-        <div className="mx-wrap" ref={wrapRef}>
+        <div
+          className="mx-wrap"
+          ref={wrapRef}
+          onTouchStart={onTouchStart}
+          onTouchEnd={onTouchEnd}
+        >
           <table className="mx">
             <thead>
               <tr>
@@ -136,23 +166,30 @@ export function Matrix() {
                     Arrows are the guaranteed path on every device; the
                     column is frozen alongside the callsign so the figure
                     stays beside the name however far the grid scrolls. */}
+                {/* The WHOLE header is the control. It was two 13px arrows
+                    either side of the label, and the owner's verdict from a
+                    phone was that they are too small to hit — which they
+                    were: a glyph in a 44px column is not a tap target.
+
+                    Tapping anywhere on the header opens a sheet listing every
+                    counter at full width, which is the guaranteed path on any
+                    device. Swiping across the column is the fast one, and is
+                    handled on `.mx-wrap` below. The arrows are gone rather
+                    than kept alongside: leaving a control that is known to be
+                    too small to hit is worse than having one way in. */}
                 <th className="bal" data-testid="counter-head">
                   <button
-                    className="cnav"
-                    data-testid="counter-prev"
-                    aria-label={`Show the previous counter (now ${counterLabel(shown)})`}
-                    onClick={() => cycle(-1)}
+                    className="cpick"
+                    data-testid="counter-pick"
+                    aria-label={`Showing ${counterLabel(shown)}. Choose a counter`}
+                    onClick={() => setPicking(true)}
                   >
-                    ‹
-                  </button>
-                  <span className="cname" data-testid="counter-name">{counterLabel(shown)}</span>
-                  <button
-                    className="cnav"
-                    data-testid="counter-next"
-                    aria-label={`Show the next counter (now ${counterLabel(shown)})`}
-                    onClick={() => cycle(1)}
-                  >
-                    ›
+                    <span className="cname" data-testid="counter-name">{counterLabel(shown)}</span>
+                    <span className="cdots" aria-hidden="true">
+                      {COUNTERS.map((_, i) => (
+                        <span key={i} className={`cdot${i === counter ? ' on' : ''}`} />
+                      ))}
+                    </span>
                   </button>
                 </th>
                 {period.days.map(d => {
@@ -332,6 +369,9 @@ export function Matrix() {
           wins on a cell that holds a bid, because that is what the stage is
           for; the picker still opens on an empty one, so an admin can add
           leave to a closed sheet without a second control. */}
+      {picking && (
+        <CounterSheet shown={shown} onPick={setCounter} onClose={() => setPicking(false)} />
+      )}
       {open && !raptorOwns(states, open.id, open.date)
         && canEditCell(period, role, open.date)
         && !(deciding && isBiddable(grid[open.id]?.[open.date])) && (
@@ -342,6 +382,27 @@ export function Matrix() {
           date={open.date}
           current={grid[open.id]?.[open.date] ?? ''}
           dates={dates}
+          /* The counter column follows the leave just entered — ask for OIL
+             and the panel snaps to OIL. The owner's ask, and it makes the
+             figure answer the question the bidder is actually holding in
+             their head at that moment. Derived through the catalogue, so a
+             leave type added later needs no edit here; OFF spends nothing,
+             so it moves nothing. */
+          onWrote={code => {
+            const spends = codeOf(code)?.spends
+            if (!spends) return
+            const i = COUNTERS.indexOf(spends.counter)
+            if (i >= 0) setCounter(i)
+          }}
+          /* What the balance would read AFTER this write, so the sheet can
+             ask before taking someone negative. Computed here because this
+             is where the wars, openings and ledger already are. */
+          wouldLeave={(code, days) => {
+            const spends = codeOf(code)?.spends
+            if (!spends) return null
+            const left = balanceOf(openings, ledger, wars, open.id, spends.counter)
+            return { counter: spends.counter, after: left - spends.amount * days }
+          }}
           onClose={close}
         />
       )}
