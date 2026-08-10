@@ -15,6 +15,7 @@ import {
   setRole,
 } from '../state/store'
 import { RangePicker, type Range } from './RangePicker'
+import { Sheet } from './Sheet'
 import { shortDate, shortSpan } from './dates'
 import { WarSheet } from './WarSheet'
 import { useVersion } from './useStore'
@@ -119,7 +120,7 @@ function WindowSheet({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <div className="bidsheet" data-testid="window-sheet" role="dialog" aria-label="Open bidding on">
+    <Sheet testid="window-sheet" label="Open bidding on" onClose={onClose}>
       <div className="bidsheet-hd">
         <span className="who">OPEN BIDDING ON</span>
         <span className="dt">{period.name}</span>
@@ -148,7 +149,7 @@ function WindowSheet({ onClose }: { onClose: () => void }) {
         </span>
         {problem && <span className="note warn" data-testid="window-problem">{problem}</span>}
       </div>
-    </div>
+    </Sheet>
   )
 }
 

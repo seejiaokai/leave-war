@@ -13,6 +13,7 @@
 
 import { balanceOf, COUNTERS, counterLabel, type CounterName } from '../engine'
 import { getState } from '../state/store'
+import { Sheet } from './Sheet'
 import './bidpicker.css'
 
 /** Rounds for display only, the same rule the grid and the count rows use. */
@@ -30,7 +31,7 @@ export function CounterSheet({
   const { people, openings, ledger, wars } = getState()
 
   return (
-    <div className="bidsheet" data-testid="counter-sheet" role="dialog" aria-label="Which counter">
+    <Sheet testid="counter-sheet" label="Which counter" onClose={onClose}>
       <div className="bidsheet-hd">
         <span className="who">WHICH COUNTER</span>
         <span className="dt">shown beside every callsign</span>
@@ -59,6 +60,6 @@ export function CounterSheet({
           )
         })}
       </div>
-    </div>
+    </Sheet>
   )
 }

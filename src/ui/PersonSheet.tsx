@@ -12,10 +12,11 @@
 import { categoryLabel, type Person } from '../engine'
 import { setPerson } from '../state/store'
 import './bidpicker.css'
+import { Sheet } from './Sheet'
 
 export function PersonSheet({ person, onClose }: { person: Person; onClose: () => void }) {
   return (
-    <div className="bidsheet" data-testid="person-sheet" role="dialog" aria-label="Edit aircrew">
+    <Sheet testid="person-sheet" label="Edit aircrew" onClose={onClose}>
       <div className="bidsheet-hd">
         <span className="who">{person.callsign}</span>
         <span className="dt" data-testid="person-category">{categoryLabel(person)}</span>
@@ -73,6 +74,6 @@ export function PersonSheet({ person, onClose }: { person: Person; onClose: () =
           SXO row and the category row both include them.
         </span>
       </div>
-    </div>
+    </Sheet>
   )
 }

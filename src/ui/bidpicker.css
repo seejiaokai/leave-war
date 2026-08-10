@@ -6,6 +6,16 @@
    anything positioned inside a cell is clipped by that scroller. Anchored to
    the bottom of the viewport it is also where a thumb already is on a
    phone. */
+/* Sits under every sheet and over everything else, so a tap anywhere but the
+   sheet dismisses it. Transparent on purpose — the grid behind a sheet is
+   what somebody is reading while they decide, and dimming it would be a new
+   visual language for a behaviour that is meant to be invisible. */
+.sheetscrim {
+  position: fixed;
+  inset: 0;
+  z-index: 79;
+}
+
 .bidsheet {
   position: fixed;
   z-index: 80;

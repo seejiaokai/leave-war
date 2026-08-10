@@ -65,24 +65,59 @@ test('the callsign column stays put when the grid scrolls sideways', async ({ pa
   expect(Math.abs(after!.x - before!.x)).toBeLessThan(1)
 })
 
-test('the date header stays put when the grid scrolls down', async ({ page }) => {
-  // .mx-wrap's content is 1 header + 6 count rows + 16 person rows ≈ 23
-  // rows × ~21px ≈ 492px, which fits inside the default viewport height on
-  // both projects (664px phone, 900px desktop) — the wrapper never
-  // overflows vertically there, so `scrollBy(0, 400)` would be a silent
-  // no-op. Shrink the viewport so the scroller genuinely has to scroll.
+// Replaced the sticky-date-header test on 10 Aug 26, when the owner asked for
+// ONE vertical scroll. That test asserted the header held still while
+// `.mx-wrap` scrolled down; the wrapper no longer scrolls down at all, so it
+// failed at its own `scrollTop > 0` guard rather than passing against a
+// header that had quietly stopped sticking. The guard is why the change was
+// caught instead of shipped.
+//
+// What replaces it is the property actually wanted: the grid contributes no
+// vertical scroller of its own, and the page carries all of it.
+test('the grid has no vertical scroller of its own', async ({ page }) => {
+  // Small enough that the old 86vh cap would certainly have overflowed.
   await page.setViewportSize({ width: 390, height: 320 })
-  const head = page.locator('[data-testid="head-2026-01-15"]')
-  const before = await head.boundingBox()
   const wrap = page.locator('.mx-wrap')
+  const before = await wrap.evaluate(el => el.scrollTop)
   await wrap.evaluate(el => el.scrollBy(0, 400))
-  // Prove the container actually moved before trusting the "unchanged"
-  // header position as evidence the header is sticky rather than evidence
-  // that nothing happened.
-  const scrollTop = await wrap.evaluate(el => el.scrollTop)
-  expect(scrollTop).toBeGreaterThan(0)
-  const after = await head.boundingBox()
-  expect(Math.abs(after!.y - before!.y)).toBeLessThan(1)
+  expect(await wrap.evaluate(el => el.scrollTop)).toBe(before)
+  // Nothing to scroll, rather than scrolling that happens to be refused.
+  const room = await wrap.evaluate(el => el.scrollHeight - el.clientHeight)
+  expect(room).toBeLessThanOrEqual(1)
+})
+
+test('the page is the one thing that scrolls vertically', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 320 })
+  // The roster is taller than a 320px viewport, so the page must have
+  // somewhere to go — otherwise the rows below the fold are unreachable.
+  const room = await page.evaluate(
+    () => document.documentElement.scrollHeight - document.documentElement.clientHeight,
+  )
+  expect(room).toBeGreaterThan(0)
+  await page.evaluate(() => window.scrollBy(0, 200))
+  expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0)
+
+  // And it is the ONLY one: no descendant of the card may offer a second.
+  const nested = await page.evaluate(() =>
+    [...document.querySelectorAll('.card *')]
+      .filter(el => {
+        const s = getComputedStyle(el)
+        return (s.overflowY === 'auto' || s.overflowY === 'scroll')
+          && el.scrollHeight - el.clientHeight > 1
+      })
+      .map(el => el.className),
+  )
+  expect(nested).toEqual([])
+})
+
+// The horizontal axis did NOT move to the page — 365 columns is ~13,600px and
+// a page that wide would take the chrome with it. This is the pairing that
+// makes the change safe, and it is why the wrapper still scrolls one axis.
+test('the grid still owns the sideways scroll', async ({ page }) => {
+  const wrap = page.locator('.mx-wrap')
+  expect(await wrap.evaluate(el => el.scrollWidth - el.clientWidth)).toBeGreaterThan(0)
+  await wrap.evaluate(el => el.scrollBy(600, 0))
+  expect(await wrap.evaluate(el => el.scrollLeft)).toBeGreaterThan(0)
 })
 
 test('the frozen column is opaque — day cells never show through it', async ({ page }) => {

@@ -135,7 +135,11 @@ describe('the month strip says which month is on screen', () => {
     expect(lit()).toEqual(['FEB'])
   })
 
-  it('follows the grid as it scrolls', () => {
+  // Split from one three-step test on 10 Aug 26: each `layoutYear` fires a
+  // scroll, which re-renders all 365 columns, and three of those in one test
+  // ran to 5s and started timing out under load. Two re-renders is the most
+  // any one of these now does.
+  it('changes as the grid scrolls', () => {
     render(<Matrix />)
     act(() => layoutYear(0))
     expect(lit()).toEqual(['FEB'])
@@ -146,7 +150,15 @@ describe('the month strip says which month is on screen', () => {
     // right and the expectation was wrong.)
     act(() => layoutYear(1800))
     expect(lit()).toEqual(['AUG'])
-    // At 3000: NOV 0..300 gives 138, DEC 300..600 gives its whole width.
+  })
+
+  // December's right edge is the only one computed from the last column
+  // rather than from the next month's first, so the far end of the year is
+  // worth asking about on its own.
+  it('reads the far end of the year', () => {
+    render(<Matrix />)
+    // NOV 0..300 gives 138 of the visible 162..800; DEC 300..600 gives all
+    // 300 of itself.
     act(() => layoutYear(3000))
     expect(lit()).toEqual(['DEC'])
   })

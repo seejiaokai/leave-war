@@ -1,13 +1,26 @@
 /* The matrix — Raptor's chip-and-card idiom. The .card/.stage wrapper this
    table sits inside lives in chrome.css. */
 
-/* 86vh, raised from 74vh on 10 Aug 26. The topbar no longer sticks, so once
-   the chrome is out of the way the grid should be able to fill what is left —
-   at 74vh it stopped short of the bottom and the page simply ended in empty
-   space. The remaining 14% is the card's own padding and the month strip. */
+/* ONE vertical scroll on the page, none inside the grid (owner, 10 Aug 26).
+   It used to be `overflow: auto; max-height: 86vh`, which gave a phone two
+   vertical scrollers stacked inside each other — drag the grid and you could
+   never be sure which one would move.
+   So the wrapper scrolls HORIZONTALLY only and has no height cap: it grows to
+   whatever the roster needs and the page carries the vertical scrolling for
+   all of it. `overflow-y: hidden` never actually clips anything, because with
+   no cap there is no vertical overflow to clip; it is there to stop the
+   browser giving back the second scrollbar.
+
+   The cost, stated plainly because it is a real loss: the date header no
+   longer sticks. `position: sticky` resolves against the nearest scrollport,
+   which is still this wrapper, and this wrapper no longer scrolls vertically —
+   so scrolling the PAGE carries the header away with it. There is no CSS that
+   both scrolls one axis here and lets a descendant stick to the page's other
+   axis. The frozen callsign and counter columns are unaffected: they stick on
+   `left`, and this wrapper still owns the horizontal axis. */
 .mx-wrap {
-  overflow: auto;
-  max-height: 86vh;
+  overflow-x: auto;
+  overflow-y: hidden;
   -webkit-overflow-scrolling: touch;
 }
 

@@ -208,7 +208,39 @@ test code needs to change.
   ✕, on another cell, or on a choice is what closes them. The role is right
   for what they are; the interaction is not yet complete.
 
+## The date header no longer sticks
+
+Given up on 10 Aug 26 to buy the owner's ask for ONE vertical scroll. The grid
+wrapper scrolls horizontally only now and the page carries the vertical
+scrolling for everything, so scrolling down takes the date header with it.
+
+It is not a bug and there is no CSS that avoids it: `position: sticky`
+resolves against the nearest scrollport, the wrapper is still that scrollport
+because it scrolls one axis, and it no longer scrolls vertically. An element
+cannot scroll one axis itself and let a descendant stick to the page's other
+axis.
+
+Two ways out if it starts to hurt, neither free:
+
+- **Invert the single scroll.** Pin the page (`html, body { overflow: hidden }`),
+  let the grid fill the viewport and be the only vertical scroller. That is
+  still one scroll, keeps the sticky header, and keeps the chrome permanently
+  visible — but it is the scroll the owner asked NOT to have.
+- **Lift the header out of the scroller.** A second, non-scrolling copy of the
+  date row above the grid, its horizontal offset synced to the wrapper's
+  `scrollLeft`. Costs a sync path that can drift, which is the failure this
+  codebase keeps choosing to avoid.
+
+The roster is roughly one-and-a-quarter phone screens tall, so the header goes
+out of view during ordinary use rather than only in extreme cases. Worth
+raising with the owner rather than assuming it is fine.
+
 ## Rulings made, so they are not relitigated
+
+- **The scrim lives in the `Sheet` wrapper, not beside each sheet.** Seven
+  places open a sheet; putting the click-outside in the wrapper means an
+  eighth cannot be written without it. A per-sheet scrim would have passed its
+  own test while the next sheet shipped without one.
 
 - **`focusDate` is view state, and it lives in the domain store on purpose.**
   The stage strip and the matrix render independently of each other — neither

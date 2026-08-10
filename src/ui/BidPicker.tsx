@@ -17,6 +17,7 @@ import { useState } from 'react'
 import { addDays, formatCell, LEAVE_TYPES, type BidState, type CounterName, type Portion } from '../engine'
 import { setBidState, setCell, setCellRange, shiftBid } from '../state/store'
 import { RangePicker, type Range } from './RangePicker'
+import { Sheet } from './Sheet'
 import { shortSpan } from './dates'
 import './bidpicker.css'
 
@@ -111,7 +112,7 @@ export function BidPicker({
   }
 
   return (
-    <div className="bidsheet" data-testid="bid-picker" role="dialog" aria-label="Place a bid">
+    <Sheet testid="bid-picker" label="Place a bid" onClose={onClose}>
       <div className="bidsheet-hd">
         <span className="who">{callsign}</span>
         <span className="dt">{date}</span>
@@ -201,7 +202,7 @@ export function BidPicker({
         </button>
         {note && <span className="note warn" data-testid="span-note">{note}</span>}
       </div>
-    </div>
+    </Sheet>
   )
 }
 
@@ -262,7 +263,7 @@ export function DecisionSheet({
   }
 
   return (
-    <div className="bidsheet" data-testid="bid-picker" role="dialog" aria-label="Decide a bid">
+    <Sheet testid="bid-picker" label="Decide a bid" onClose={onClose}>
       <div className="bidsheet-hd">
         <span className="who">{callsign}</span>
         <span className="dt">{date}</span>
@@ -331,7 +332,7 @@ export function DecisionSheet({
         </button>
         {problem && <span className="note warn" data-testid="shift-problem">{problem}</span>}
       </div>
-    </div>
+    </Sheet>
   )
 }
 
@@ -357,7 +358,7 @@ export function RaptorSheet({
   onClose: () => void
 }) {
   return (
-    <div className="bidsheet" data-testid="raptor-sheet" role="dialog" aria-label="Leave from Raptor">
+    <Sheet testid="raptor-sheet" label="Leave from Raptor" onClose={onClose}>
       <div className="bidsheet-hd">
         <span className="who">{callsign}</span>
         <span className="dt">{date}</span>
@@ -373,6 +374,6 @@ export function RaptorSheet({
           syncs back here.
         </span>
       </div>
-    </div>
+    </Sheet>
   )
 }

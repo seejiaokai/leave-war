@@ -14,6 +14,7 @@ import { clashingWar, createWar, getState } from '../state/store'
 import { RangePicker, type Range } from './RangePicker'
 import { shortSpan } from './dates'
 import './bidpicker.css'
+import { Sheet } from './Sheet'
 
 const WHY: Record<string, string> = {
   overlap: 'Those dates overlap a leave war that already exists. A day can only belong to one.',
@@ -62,7 +63,7 @@ export function WarSheet({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <div className="bidsheet" data-testid="war-sheet" role="dialog" aria-label="New leave war">
+    <Sheet testid="war-sheet" label="New leave war" onClose={onClose}>
       <div className="bidsheet-hd">
         <span className="who">NEW LEAVE WAR</span>
         <button className="x" data-testid="war-cancel" onClick={onClose} aria-label="Cancel">
@@ -107,6 +108,6 @@ export function WarSheet({ onClose }: { onClose: () => void }) {
         <span className="note">Starts in draft. Any span, down to a single month.</span>
         {problem && <span className="note warn" data-testid="war-problem">{problem}</span>}
       </div>
-    </div>
+    </Sheet>
   )
 }

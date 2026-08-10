@@ -6,7 +6,7 @@ where the work stopped and what comes next, so a session picking it up cold does
 not have to reconstruct it from `git log`.
 
 **State as of 10 Aug 26, after the owner's phone review and a second round of
-their notes.** 571 unit tests, 125 Playwright runs across a phone and a
+their notes.** 591 unit tests, 129 Playwright runs across a phone and a
 desktop project, clean build, all verified first-hand. Work continues on
 `claude/bidding-plan-continuation-vqnrfz`, and **`main` is merged up to it** —
 see the merge agreement in `CLAUDE.md`.
@@ -102,6 +102,24 @@ near-white. The dropped-open option list mattered more than the closed chip —
 a native `<option>` inherits the select's colours, so it was several rows of
 green on green with no border to break them up, and it now takes the neutral
 panel colours instead.
+
+**A tap outside a sheet closes it** (owner, 10 Aug 26). Closing used to be
+the sheet's own ✕ or nothing, so tapping the grid behind it — what most people
+try first — did nothing. The scrim lives inside the shared `Sheet` wrapper
+(`src/ui/Sheet.tsx`) rather than beside each of the seven places one is
+opened, so a sheet cannot be written without the behaviour. Transparent, not
+dimmed: the manning counts behind an open sheet are what someone is reading
+while they decide.
+
+**One vertical scroll, and it is the page's** (owner, 10 Aug 26). The grid
+used to be `overflow: auto; max-height: 86vh`, which stacked two vertical
+scrollers on a phone — drag the grid and you could not be sure which would
+move. The wrapper now scrolls horizontally only, with no height cap, and the
+page carries all the vertical scrolling. **This cost the sticky date header**,
+which is recorded in `docs/known-gaps.md`: `position: sticky` resolves against
+the nearest scrollport, that is still this wrapper, and the wrapper no longer
+scrolls vertically. The frozen callsign and counter columns are unaffected —
+they stick on `left`, and the wrapper still owns the horizontal axis.
 
 **The month strip says where you are, not only where you can go** (owner,
 10 Aug 26). The month filling the grid is lit in the accent, and it follows a
@@ -295,13 +313,14 @@ Both are in `docs/known-gaps.md` with the reasoning:
 ```
 npm install
 npm run dev                 # or: npm run build && npx vite preview --port 4173
-npx vitest run              # 571 tests
-npm run test:e2e            # 125 runs, phone and desktop (3 touch-only skips)
+npx vitest run              # 591 tests
+npm run test:e2e            # 129 runs, phone and desktop (3 touch-only skips)
 npm run build               # typecheck + production build
 ```
 
 The browser gate is not optional decoration, and this branch is the proof.
 jsdom applies no layout and reports every rectangle as 0×0, so the unit suite
 can prove which class was emitted and nothing about what was painted. The two
-frozen columns, the sticky header, each sheet's escape from the element that
-would clip it, and whether any label is cut off are only ever verified there.
+frozen columns, which axis scrolls where, each sheet's escape from the element
+that would clip it, and whether any label is cut off are only ever verified
+there.
