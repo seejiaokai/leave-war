@@ -103,6 +103,7 @@ Every code carries four facts, replacing today's "any text means gone":
 | `FCL` | family care leave | 1.0 | FCL | — | yes |
 | `PL` | paternity leave | 1.0 | PL | — | yes |
 | `EL` | embarkation leave | 1.0 | EL | — | yes |
+| `OFF` | off — free leave | 1.0 | *nothing* | — | yes |
 | `M` | medical (HL/ATT C) | 1.0 | — | — | no |
 | `HL` | hospitalisation leave | 1.0 | — | — | no |
 | `CSE` | course | 1.0 | — | — | no |
@@ -122,6 +123,23 @@ was never in question.
 
 Both edits took a counter with them without anyone touching the counter list,
 because that list is derived from this table rather than restated beside it.
+
+### OFF, and what "removes" really means
+
+**Added 10 Aug 26**, from two of the owner's notes on the same day.
+
+`OFF` is **free leave**: "free leave that doesn't consume any leave, but it
+will count that manpower as gone too". It is a LEAVE TYPE, not a marker — the
+person asks for it and management answers, because it takes a man out of the
+manning picture exactly as annual leave does — and it is the only one with no
+counter. What it is not is an entitlement, so there is no balance to draw.
+
+`OD` **counts the manpower as gone**, which it always did: every non-leave
+marker removes the whole day. Worth stating because the contrast is easy to
+get backwards. `FS`/`HS` also leave the flying count, but that person is AT
+WORK and appears on the separate duty line — a day thin because half the
+squadron is on SC reads very differently from one thin because half the
+squadron is abroad. `OD` must never appear there.
 
 ### SC duty and the counts
 
@@ -165,6 +183,13 @@ A leave war is a period with stages, not a permanently open calendar.
 | **Open** | squadron | Bids are placed. Each lands as `TBC`. Counts and warnings are live. |
 | **Closed** | — | Bidding stops. The picture freezes for review. |
 | **Published** | management | Every bid is approved or refused, and the squadron sees the outcome. |
+
+**The colours were restated by the owner on 10 Aug 26**, and the table below
+this paragraph is superseded by §Interface: an input nobody has answered
+carries NO colour, purple means management has ACKNOWLEDGED it, green is
+approved and red refused. The four-state model exists because purple used to
+mean "typed", which made a bid nobody had looked at and one already in
+management's hands the same colour.
 
 Bids awaiting a decision are magenta `TBC`, approved are green, refused are
 red — the squadron's existing colour convention, unchanged.
@@ -344,7 +369,8 @@ Colours, end to end:
 
 | What | Where | Colour |
 |---|---|---|
-| Bid awaiting decision | person's cell | magenta |
+| Input, nobody has answered it | person's cell | **no colour** — plain text |
+| Acknowledged, not yet decided | person's cell | magenta |
 | Approved | person's cell | green |
 | Refused | person's cell | red |
 | SC duty earning OIL | person's cell | yellow |
@@ -356,8 +382,35 @@ different rows: blocked is a property of the day and lives on the date header;
 amber and red are computed and live on the count rows beneath. If that proves
 too subtle in use, the blocked column gets a hatch instead of a tint.
 
+**Reading a year on a phone, settled 10 Aug 26 by measurement.** At 390×760
+the chrome held 690px of a 760px screen and left four aircrew rows visible.
+The topbar now scrolls away (the date header inside the grid stays sticky,
+which is the only part that was load-bearing while reading) and a phone
+breakpoint tightens what is left: 229px of chrome, 15 rows, 7 day columns.
+Every date column names its weekday, because a year numbered 01…31 twelve
+times over gives the eye nothing to hold on to.
+
+**Every control is sized for a thumb.** The counter column's ‹ › arrows were
+13px glyphs in a 44px column and the owner could not hit them; the whole
+column header is now the control, opening a sheet of full-width 44px rows,
+with a swipe across the column as the fast path. That mistake set the size
+for everything after it — the range calendar's days are 36px and its month
+arrows 34px.
+
+**Two event lines per day**, admin-written and squadron-read. The column
+widens to fit, up to a ceiling, then wraps and grows those two rows only —
+never anybody else's, or a year stops being readable the moment one day is
+busy.
+
+**Leave is asked for in spans.** One calendar, tap a start, tap an end, with
+the range drawn between them. The same control sets a war's dates and a
+bidding window. Two native date inputs cannot show a range at all: the first
+has closed before the second opens.
+
 Beyond the matrix: a person's own page (balances, bids, ledger history), the
-ledger view (filterable, squadron-wide), the rules editor, and the roster.
+ledger view (filterable, squadron-wide), the rules editor, and the roster —
+though the roster's core is now editable in place: seat, band and SXO, with
+the category still derived and an SXO reading `OPSP(S)`.
 
 ## Architecture
 

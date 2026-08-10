@@ -5,9 +5,10 @@ spreadsheet the squadron uses to bid for leave ahead of time. This file says
 where the work stopped and what comes next, so a session picking it up cold does
 not have to reconstruct it from `git log`.
 
-**State as of 10 Aug 26.** 416 unit tests, 62 Playwright runs (31 tests across
-a phone and a desktop project), clean build, all verified first-hand. Work sits
-on `claude/bidding-plan-continuation-vqnrfz`, branched from `main`.
+**State as of 10 Aug 26, after the owner's phone review.** 548 unit tests,
+101 Playwright runs across a phone and a desktop project, clean build, all
+verified first-hand. Work sits on `claude/bidding-plan-continuation-vqnrfz`,
+branched from `main`.
 
 ## What exists
 
@@ -32,6 +33,15 @@ and it lands in draft; a picker in the topbar switches between them. A date
 belongs to at most one war, and **a balance counts leave from every war**,
 because entitlements are continuous and wars are only windows onto them.
 
+**The year is the sheet; bidding opens on a RANGE inside it** (settled with
+the owner, 10 Aug 26). Their screenshot showed them creating "JUL - SEP 26"
+while a war was already a whole year and wars may not overlap — so "show me
+the entire year" and "the admin opens a period, usually monthly" were
+fighting. They chose: one sheet per calendar year, always showing all 365
+days, and a window opened inside it that only the squadron is held to. Nobody
+creates a quarter-length war again. `canEditCell(period, role, date)` is the
+one place stage, role and window meet.
+
 **A war is a whole year on screen, with a month strip to navigate it**
 (owner's ask, 10 Aug 26: see the entire year, with a quick jump to a month).
 The seeded wars are Jan–Dec 26 and Jan–Dec 27. The strip scrolls, it never
@@ -48,6 +58,26 @@ overlap.
 exists. Leave entered on Raptor's input tab arrives already approved — putting
 it there means the person asked verbally and was told yes — and Raptor owns
 those cells thereafter.
+
+**A bid is plain until somebody looks at it.** Four states, and the colours
+are the owner's: pending is plain text on the ordinary cell background,
+purple means management has acknowledged it, green approved, red refused.
+Purple used to mean "typed", which made a bid nobody had touched and one
+already in hand the same colour.
+
+**Leave is asked for in spans, not in days.** One calendar, tap a start, tap
+an end — the same control creates a war and opens a bidding window. A range
+that crosses a locked day writes what it may and says what it skipped.
+
+**The counter column is a thumb target**, follows the leave just entered, and
+asks before taking somebody negative — never refuses, because the squadron's
+own workbook runs negative.
+
+**The roster is editable**: seat, band and SXO, with the category still
+derived and an SXO reading `OPSP(S)`.
+
+**Every day has two event lines**, admin-written and squadron-read, widening
+to fit and then wrapping without growing anybody's row but their own.
 
 Five rulings are visible on screen rather than merely written down:
 
@@ -121,6 +151,14 @@ That has now caught, across two branches:
   `initStore` twice with no write between them, so nothing was ever saved and
   it never round-tripped through storage. It passed against a loader that
   discarded every day.
+- **A sixth, seventh and eighth**, all in the browser gate and all found by
+  probing rather than reading. The balance-column opacity test asserted only
+  "not transparent", which a 5%-alpha tint satisfies — it passed throughout
+  the defect the owner reported. Its first two rewrites were no better:
+  `alpha < 1` is satisfied by a fully transparent cell, and the hovered cell
+  changes colour anyway through `.act:hover`, so a stylesheet with the row
+  rule deleted passed both. It now measures a SIBLING cell and takes its
+  readings before anything is hovered.
 - **A fifth, and a dead branch with it**, in the month strip: `monthsIn` began
   with `if (end < start) return []`, and a probe showed the branch could never
   change the answer — the loop condition `d <= end` is already false on the
@@ -140,6 +178,23 @@ which is why the geometry gate is not optional decoration:
   `.topbar` carries `backdrop-filter` and that makes it the containing block
   for any `position: fixed` descendant. Every unit test passed while it was
   broken.
+
+And three more found by LOOKING, on 10 Aug 26:
+
+- The weekday label ran into the date as "SAT03" — one token, which widened
+  every column in the year from 37px to 95px. Caught in a screenshot.
+- An `<input>` with `width: 100%` contributes nothing to a table column's
+  content width, so an event never widened its day however much was typed.
+  The member's plain-text row widened correctly all along, which is what made
+  it confusing.
+- ...and an `<input>` cannot wrap at all, so the column then never wrapped
+  either. It is a `<textarea>` — which is what the owner asked for in the
+  first place.
+
+**Twice, a stale `vite preview` server made the browser gate a lie.**
+`reuseExistingServer` reused a server left running from a manual screenshot,
+so `npm run build` never ran and mutation probes "passed" against code that
+was never compiled. See `docs/known-gaps.md` for how to kill it.
 
 The space arithmetic that justified the counter column was **also wrong on
 paper** — it read 30px day columns off `min-width` where they render at 41px.
@@ -162,8 +217,8 @@ Both are in `docs/known-gaps.md` with the reasoning:
 ```
 npm install
 npm run dev                 # or: npm run build && npx vite preview --port 4173
-npx vitest run              # 416 tests
-npm run test:e2e            # 62 runs, phone and desktop
+npx vitest run              # 548 tests
+npm run test:e2e            # 101 runs, phone and desktop (3 touch-only skips)
 npm run build               # typecheck + production build
 ```
 

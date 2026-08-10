@@ -85,6 +85,28 @@ posted to the ledger here**. The grid is already that record, and a second
 copy of it would be a second version of the truth. The ledger holds only what
 the grid cannot know.
 
+## The owner's review of 10 Aug 26, and what it settled
+
+Twelve pieces of feedback from a phone. What they changed is in the spec; what
+they SETTLED is here, so it is not relitigated:
+
+- **The year is the sheet; bidding opens on a range inside it.** A quarter is
+  never a war of its own again. Asked and answered when their screenshot
+  showed "JUL - SEP 26" being created inside a year-long 2026.
+- **A bid nobody has answered carries no colour.** Purple means management has
+  acknowledged it. This is why `acknowledged` exists at all.
+- **`OFF` is leave, not a marker.** Free — no entitlement spent — but the
+  person is gone from the manning picture, so it is asked for and answered
+  like any other leave. The only leave type with a null counter.
+- **`OD` counts the manpower as gone**, and always did. Pinned at the count
+  level now.
+- **There is no PCL.** See the leave-type section below.
+- **Events are the scheduler's**, not the bidder's: admin-only to write, and
+  everyone reads them.
+- **The category is still derived.** The roster sheet edits seat, band and
+  SXO — never the category itself — because that derivation is what lets
+  Raptor's roster replace this one without a migration.
+
 ## Wars, and what is not built about them
 
 An admin can create a leave war over any span and switch between them. Three
@@ -105,6 +127,12 @@ things are deliberately absent:
   knowing before writing a test: **there is no free date nearer than 2028**,
   so anything creating a war has to reach that far out or be refused for
   overlap. Two e2e tests and several store tests moved for exactly this.
+- **The bidding window does not bind an admin**, and never overrides the
+  stage. It holds the SQUADRON to the part of the year the schedule has
+  reached; a closed war is closed to them on every date, window or no window.
+- **A window is refused, never clamped.** An admin who typed the wrong year
+  has made a mistake worth being told about; sliding their dates to the
+  period's edges would leave them believing they opened something else.
 - **A month is only navigation, never a filter.** The strip scrolls the year
   to a month; it does not narrow the grid to it. That was the owner's ask —
   see the whole year, jump to a month — and it matters because a filter would
@@ -197,6 +225,21 @@ test code needs to change.
 
 ## Small and safe to carry
 
+- **The swipe on the counter column is gated only on the phone project**,
+  because Chromium's touch emulation is what dispatches it. Three tests skip
+  elsewhere rather than pretending to have run. The sheet — the guaranteed
+  path — is gated on both.
+- **`.bidsheet`'s `max-height` is belt and braces, not tested.** The gate
+  asserts every sheet sits wholly inside the viewport and deleting it does not
+  break that: the tallest sheet is ~500px against a 664px phone, so nothing
+  yet overflows. It is there for the sheet that eventually does.
+- **A stale `vite preview` server will silently invalidate the browser gate.**
+  `playwright.config.ts` sets `reuseExistingServer: !CI`, so a server left
+  running from a manual screenshot is reused and `npm run build` never runs —
+  the gate then tests the last build, not the working tree. This cost real
+  time twice on 10 Aug 26: mutation probes "passed" against code that was
+  never compiled. Kill it with `pkill -f "vite prev[i]ew"` — the bracket stops
+  the pattern matching the shell running it.
 - One test writes a real `leavewar:grid` key into jsdom's storage and does not
   clean it up. Harmless while every other test passes an explicit backend and
   none calls bare `initStore()` — it becomes a cross-test dependency the day one
