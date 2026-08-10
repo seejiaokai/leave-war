@@ -216,20 +216,45 @@ test('the whole month strip is on screen at phone width', async ({ page }) => {
   }
 })
 
-test('the three bid states are three distinguishable colours', async ({ page }) => {
+// The owner's colour rule, restated 10 Aug 26: a bid nobody has answered
+// carries no colour at all, purple means management has acknowledged it,
+// green approved, red refused. jsdom can prove which class was emitted and
+// nothing about what was painted — only a browser computes the cascade.
+test('the four bid states read as three colours and one plain cell', async ({ page }) => {
   const bg = (sel: string) => page.locator(sel).evaluate(el => getComputedStyle(el).backgroundColor)
   const appr = await bg('[data-testid="cell-jaguar-2026-01-16"] .c')
-  const tbc = await bg('[data-testid="cell-asics-2026-01-23"] .c')
+  const ack = await bg('[data-testid="cell-asics-2026-02-24"] .c')
   const ref = await bg('[data-testid="cell-jaguar-2026-01-19"] .c')
-  expect(new Set([appr, tbc, ref]).size).toBe(3)
-  for (const c of [appr, tbc, ref]) expect(c).not.toBe('rgba(0, 0, 0, 0)')
+  expect(new Set([appr, ack, ref]).size).toBe(3)
+  for (const c of [appr, ack, ref]) expect(c).not.toBe('rgba(0, 0, 0, 0)')
+
+  // Pending is the absence of news, so it must be the absence of paint —
+  // asserted against all three answered colours, not merely "not purple".
+  const pending = await bg('[data-testid="cell-asics-2026-01-23"] .c')
+  expect(pending).toBe('rgba(0, 0, 0, 0)')
+  for (const c of [appr, ack, ref]) expect(pending).not.toBe(c)
+
+  // Plain must still be READABLE. A cell with no background is only correct
+  // if its text keeps the ordinary ink — an invisible bid would be worse
+  // than a wrongly coloured one.
+  const ink = await page.locator('[data-testid="cell-asics-2026-01-23"] .c')
+    .evaluate(el => getComputedStyle(el).color)
+  const body = await page.evaluate(() => getComputedStyle(document.body).color)
+  expect(ink).toBe(body)
 })
 
-test('a bid can be placed and shows as pending', async ({ page }) => {
+// A bid lands PENDING, which since 10 Aug 26 means plain — no colour class
+// at all. It used to assert `tbc`, which is now the acknowledged colour: the
+// squadron must be able to tell a bid nobody has looked at from one already
+// in management's hands, and a freshly typed bid is the former.
+test('a bid can be placed, and lands plain because nobody has answered it', async ({ page }) => {
   await page.locator('[data-testid="cell-dusk-2026-02-11"]').click()
   await page.locator('[data-testid="bid-LL"]').click()
-  const cls = await page.locator('[data-testid="cell-dusk-2026-02-11"] .c').getAttribute('class')
-  expect(cls).toContain('tbc')
+  const chip = page.locator('[data-testid="cell-dusk-2026-02-11"] .c')
+  await expect(chip).toBeVisible()
+  const cls = (await chip.getAttribute('class'))!
+  for (const painted of ['tbc', 'appr', 'ref']) expect(cls).not.toContain(painted)
+  expect(await chip.evaluate(el => getComputedStyle(el).backgroundColor)).toBe('rgba(0, 0, 0, 0)')
 })
 
 // The reason the bid sheet is a fixed-position sheet rather than a popover
@@ -332,8 +357,13 @@ test('an admin moves a bid to another date, and it lands pending there', async (
   await expect(page.locator('[data-testid="cell-asics-2026-01-23"] .c')).toHaveCount(0)
   const moved = page.locator('[data-testid="cell-asics-2026-01-30"] .c')
   await expect(moved).toBeVisible()
-  expect(await moved.getAttribute('class')).toContain('tbc')
-  expect(await moved.getAttribute('class')).toContain('moved')
+  // A shift lands PENDING — a move is a proposal, and someone still has to
+  // approve the date it moved to — so the chip is plain, not purple. The
+  // dotted `moved` edge is what says it was shifted, and it sits on top of
+  // whatever state colour there is or is not.
+  const cls = (await moved.getAttribute('class'))!
+  for (const painted of ['tbc', 'appr', 'ref']) expect(cls).not.toContain(painted)
+  expect(cls).toContain('moved')
 })
 
 // ---- the frozen counter column ----

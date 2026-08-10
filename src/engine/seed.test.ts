@@ -87,9 +87,9 @@ describe('seed', () => {
 })
 
 describe('seedStates', () => {
-  it('shows all three states so the screen exercises every colour', () => {
+  it('shows all four states so the screen exercises every colour', () => {
     const seen = new Set(Object.values(seedStates()).flatMap(r => Object.values(r).map(v => v.state)))
-    expect(seen).toEqual(new Set(['pending', 'approved', 'refused']))
+    expect(seen).toEqual(new Set(['pending', 'acknowledged', 'approved', 'refused']))
   })
 
   // Both sources have to render on first run for the same reason all three

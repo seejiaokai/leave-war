@@ -117,7 +117,10 @@ function isValidGrid(x: unknown): x is Grid {
   return true
 }
 
-const BID_STATES = new Set(['pending', 'approved', 'refused'])
+// `acknowledged` joined these on 10 Aug 26. A blob written before that date
+// cannot contain it, and one written after cannot contain anything else — so
+// the set only ever grows and no migration is needed either way.
+const BID_STATES = new Set(['pending', 'acknowledged', 'approved', 'refused'])
 const BID_SOURCES = new Set(['bid', 'raptor'])
 
 /**

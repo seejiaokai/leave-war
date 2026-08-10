@@ -15,7 +15,26 @@
 
 import { codeOf } from './codes'
 
-export type BidState = 'pending' | 'approved' | 'refused'
+/**
+ * What has happened to a bid, in the order it happens.
+ *
+ * The owner's own colour convention, given 10 Aug 26 and unchanged since:
+ *
+ * | state | on screen |
+ * |---|---|
+ * | `pending` | plain text on the normal cell background — no colour at all |
+ * | `acknowledged` | purple: management has seen it and not yet decided |
+ * | `approved` | green |
+ * | `refused` | red |
+ *
+ * `acknowledged` is the state added that day. Until then a bid was purple the
+ * instant it was typed, which made "somebody has looked at this" and "nobody
+ * has looked at this" the same colour — so a squadron scanning the sheet
+ * could not tell an untouched bid from one already in hand. Plain text is the
+ * absence of news, and it is the right absence: an input nobody has answered
+ * should not be shouting.
+ */
+export type BidState = 'pending' | 'acknowledged' | 'approved' | 'refused'
 
 /** Which system last wrote this cell.
  *
@@ -81,6 +100,9 @@ export function isBiddable(code: string | undefined | null): boolean {
  *  A PENDING bid does remove: the counts show the worst case, what manning
  *  becomes if everything asked for is granted, because that is what warns a
  *  scheduler while there is still time to act (owner, 9 Aug 26).
+ *  An ACKNOWLEDGED bid removes for the same reason and needed no edit here:
+ *  `!== 'refused'` already covered a state that did not exist when it was
+ *  written, which is why it was written that way rather than as a list.
  *
  *  A non-bid code always removes, whatever state may somehow be attached —
  *  a stray state must never make a sick man count as available. */

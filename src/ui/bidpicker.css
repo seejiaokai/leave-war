@@ -140,6 +140,15 @@
   border: 1px solid rgba(240, 85, 95, .5);
 }
 
+/* Acknowledge wears the purple it puts on the cell, so the button and its
+   result are recognisably the same act. It is not a decision, which is why
+   it sits before approve and refuse rather than between them. */
+.bidsheet .dchip.ack {
+  background: rgba(178, 77, 234, .16);
+  color: #D9A6F5;
+  border: 1px solid rgba(178, 77, 234, .5);
+}
+
 .bidsheet .dchip[disabled] {
   opacity: .45;
   cursor: default;

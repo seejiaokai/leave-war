@@ -125,7 +125,7 @@ export function seedGrid(): Grid {
     tata: { '2026-01-01': 'FS', '2026-01-04': 'FS', '2026-01-09': 'OIL' },
     splice: { '2026-01-05': 'M', '2026-01-06': 'M', '2026-01-08': 'LL' },
     jaguar: { '2026-01-16': 'OL', '2026-01-17': 'OL', '2026-01-19': 'OL' },
-    asics: { '2026-01-08': 'LL', '2026-01-09': 'LL', '2026-01-23': '*LL' },
+    asics: { '2026-01-08': 'LL', '2026-01-09': 'LL', '2026-01-23': '*LL', '2026-02-24': 'OIL' },
     pipper: { '2026-01-12': 'CSE', '2026-01-13': 'CSE' },
     miles: { '2026-02-02': 'LL', '2026-02-03': 'LL*' },
     roulette: { '2026-01-15': 'CCL' },
@@ -160,10 +160,14 @@ export function seedStates(): States {
       '2026-01-17': { state: 'approved', source: 'bid' },
       '2026-01-19': { state: 'refused', source: 'bid' },
     },
+    // ASICS carries all four states at once, so every colour the sheet can
+    // paint is on screen from the first run: approved green, refused red,
+    // acknowledged purple, and a plain pending input with no colour at all.
     asics: {
       '2026-01-08': { state: 'approved', source: 'bid' },
       '2026-01-09': { state: 'refused', source: 'bid' },
       '2026-01-23': { state: 'pending', source: 'bid' },
+      '2026-02-24': { state: 'acknowledged', source: 'bid' },
     },
     // MILES asked for the 4th and management moved him to the 3rd. A shift
     // lands PENDING — moving it is a proposal, and someone still has to

@@ -168,9 +168,24 @@ export function DecisionSheet({
       </div>
       <div className="bidsheet-row">
         <span className="lab">Decision</span>
-        {/* Both stay enabled on an already-decided bid. Management is meant
-            to try one and watch the count rows move, and a decision that
-            could not be changed back would make that a one-way door. */}
+        {/* All three stay enabled on an already-decided bid. Management is
+            meant to try one and watch the count rows move, and a decision
+            that could not be changed back would make that a one-way door. */}
+        {/* Acknowledging is NOT a decision, and that is why it is here rather
+            than left implicit. It says "seen, not yet answered" — the state
+            between a bid arriving and a verdict — and it is what turns the
+            cell purple. Before it existed a bid was purple from the moment it
+            was typed, so the squadron could not tell an untouched input from
+            one already in hand. */}
+        <button
+          className="dchip ack"
+          data-testid="decide-ack"
+          aria-pressed={state === 'acknowledged'}
+          title="Seen, not yet decided"
+          onClick={() => decide('acknowledged')}
+        >
+          Acknowledge
+        </button>
         <button
           className="dchip approve"
           data-testid="decide-approve"

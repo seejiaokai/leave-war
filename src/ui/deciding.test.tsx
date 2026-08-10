@@ -36,6 +36,34 @@ describe('deciding a bid', () => {
     expect(getState().states.asics['2026-01-23']?.state).toBe('approved')
   })
 
+  // Acknowledging is deliberately NOT a decision: it records that management
+  // has the bid in hand. The man stays out of the counts, because the counts
+  // show the worst case and nothing has been granted or denied yet.
+  it('acknowledges a pending bid without moving the counts', () => {
+    advanceStage()
+    setRole('admin')
+    render(<Matrix />)
+    const before = screen.getByTestId('count-opsp-2026-01-23').textContent
+    fireEvent.click(screen.getByTestId(PENDING))
+    fireEvent.click(screen.getByTestId('decide-ack'))
+    expect(getState().states.asics['2026-01-23']?.state).toBe('acknowledged')
+    expect(screen.getByTestId('count-opsp-2026-01-23').textContent).toBe(before)
+  })
+
+  // An acknowledged bid is still awaiting an answer, so all three controls
+  // have to remain on it — otherwise acknowledging would be a dead end.
+  it('still offers every control on a bid already acknowledged', () => {
+    advanceStage()
+    setRole('admin')
+    render(<Matrix />)
+    fireEvent.click(screen.getByTestId(PENDING))
+    fireEvent.click(screen.getByTestId('decide-ack'))
+    fireEvent.click(screen.getByTestId(PENDING))
+    expect(screen.getByTestId('decide-ack').getAttribute('aria-pressed')).toBe('true')
+    fireEvent.click(screen.getByTestId('decide-approve'))
+    expect(getState().states.asics['2026-01-23']?.state).toBe('approved')
+  })
+
   it('refuses a pending bid, and the man returns to the counts', () => {
     advanceStage()
     setRole('admin')

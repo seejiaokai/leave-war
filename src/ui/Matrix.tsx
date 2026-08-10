@@ -235,9 +235,16 @@ export function Matrix() {
                     // medical, a course, overseas duty. A bare "PO" chip on
                     // a posted-out cell carries no state class at all.
                     //
-                    // A bid with NO decision recorded reads as pending: the
-                    // squadron has asked and nobody has answered, which is
-                    // what "to be confirmed" means.
+                    // A bid with NO decision recorded reads as pending, and
+                    // PENDING IS PLAIN — no colour class at all, so the chip
+                    // renders as text on the ordinary cell background.
+                    //
+                    // It was purple until 10 Aug 26, when the owner pointed
+                    // out what that cost: an input nobody had looked at and
+                    // one already in management's hands were the same colour,
+                    // so the sheet could not distinguish them. Purple now
+                    // means acknowledged — somebody has seen this — and the
+                    // absence of colour means the absence of news.
                     const bid = stateOf(states, p.id, d.date)
                     const chipState = !here || !code
                       ? ''
@@ -245,7 +252,8 @@ export function Matrix() {
                       : !isBiddable(code) ? 'info'
                       : bid === 'approved' ? 'appr'
                       : bid === 'refused' ? 'ref'
-                      : 'tbc'
+                      : bid === 'acknowledged' ? 'tbc'
+                      : ''
                     // The half-day fill is read off the stored string via
                     // `parseCell`, never kept as its own bit of state and
                     // never guessed by matching an asterisk here in the

@@ -162,11 +162,18 @@ describe('weekend banding', () => {
 })
 
 describe('bid state on a cell', () => {
-  it('paints an approved bid green, a pending one purple, a refused one red', () => {
+  // The owner's colour rule, restated 10 Aug 26: an input nobody has answered
+  // carries NO colour, purple means management has acknowledged it, green
+  // approved, red refused. Purple used to mean "typed", which made a bid in
+  // management's hands look identical to one nobody had touched.
+  it('paints approved green, acknowledged purple, refused red, and pending not at all', () => {
     render(<Matrix />)
     expect(screen.getByTestId('cell-jaguar-2026-01-16').querySelector('.c')!.className).toContain('appr')
-    expect(screen.getByTestId('cell-asics-2026-01-23').querySelector('.c')!.className).toContain('tbc')
+    expect(screen.getByTestId('cell-asics-2026-02-24').querySelector('.c')!.className).toContain('tbc')
     expect(screen.getByTestId('cell-jaguar-2026-01-19').querySelector('.c')!.className).toContain('ref')
+
+    const pending = screen.getByTestId('cell-asics-2026-01-23').querySelector('.c')!.className
+    for (const painted of ['appr', 'tbc', 'ref']) expect(pending).not.toContain(painted)
   })
 
   it('leaves a code nobody bids for as plain information', () => {
@@ -193,17 +200,35 @@ describe('bid state on a cell', () => {
   })
 
   // A bid with no decision recorded is pending — the seed leaves splice's
-  // LL unstated precisely so this path renders on first run.
-  it('reads a bid with no decision recorded as pending', () => {
+  // LL unstated precisely so this path renders on first run — and pending
+  // now means NO colour. Asserted against all three painted classes rather
+  // than for one, so a cascade that reintroduced any of them fails here.
+  it('reads a bid with no decision recorded as pending, and paints it plain', () => {
     render(<Matrix />)
-    expect(screen.getByTestId('cell-splice-2026-01-08').querySelector('.c')!.className).toContain('tbc')
+    const cls = screen.getByTestId('cell-splice-2026-01-08').querySelector('.c')!.className
+    for (const painted of ['appr', 'tbc', 'ref']) expect(cls).not.toContain(painted)
   })
 
   it('re-paints when a decision is recorded', () => {
     render(<Matrix />)
-    expect(screen.getByTestId('cell-asics-2026-01-23').querySelector('.c')!.className).toContain('tbc')
+    const cls = () => screen.getByTestId('cell-asics-2026-01-23').querySelector('.c')!.className
+    expect(cls()).not.toContain('appr')
     act(() => setBidState('asics', '2026-01-23', 'approved'))
-    expect(screen.getByTestId('cell-asics-2026-01-23').querySelector('.c')!.className).toContain('appr')
+    expect(cls()).toContain('appr')
+  })
+
+  // Acknowledging is the step the owner added: it is not a decision, it says
+  // management has the bid in hand. A plain input becomes purple, and the
+  // counts do not move — an acknowledged bid still removes the person,
+  // exactly as a pending one does.
+  it('turns a plain pending input purple when it is acknowledged, without moving the counts', () => {
+    render(<Matrix />)
+    const cls = () => screen.getByTestId('cell-asics-2026-01-23').querySelector('.c')!.className
+    expect(cls()).not.toContain('tbc')
+    const before = screen.getByTestId('count-opsp-2026-01-23').textContent
+    act(() => setBidState('asics', '2026-01-23', 'acknowledged'))
+    expect(cls()).toContain('tbc')
+    expect(screen.getByTestId('count-opsp-2026-01-23').textContent).toBe(before)
   })
 
   // The counts are what a refusal is FOR: pulling a man back into the
