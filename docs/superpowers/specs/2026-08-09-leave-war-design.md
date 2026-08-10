@@ -194,9 +194,17 @@ in the interface decides which controls appear and nothing else. See
 
 **Settled, 9 Aug 26, and built 10 Aug 26.** A period is a **date range the
 admin chooses**, selectable down to a single month. A quarter is the common
-case — the reference workbook is quarterly, and the seed runs Jan–Mar — but
-it is not a constraint. The admin opens one when the schedule firms up rather
-than on any calendar trigger.
+case — the reference workbook is quarterly — but it is not a constraint. The
+admin opens one when the schedule firms up rather than on any calendar
+trigger.
+
+**The seed is a whole year, changed 10 Aug 26 at the owner's request:** they
+want to see the entire year in one leave war, with a quick way to reach a
+given month. So the seeded wars are Jan–Dec 26 (open) and Jan–Dec 27 (draft).
+A year is 365 columns, roughly 13,600px and about 9,200 DOM nodes — measured
+in a real browser *before* the change was adopted, at 687–757ms to load and
+296–355ms for a bid round-trip on both a phone and a desktop viewport. Had
+that come out in seconds the year would not have shipped.
 
 Many periods exist at once and one is on screen. A **leave war** is a period
 together with the leave and bids inside it; the three travel as a unit so a
@@ -214,12 +222,31 @@ leave and OIL do not reset when a quarter closes, so a balance counts leave
 from **every** war, not the one being looked at. A figure counting only the
 current war would let the same twenty days be bid twice, once in each.
 
-Two things follow. The engine already models this correctly: `Period` carries
-free `start`/`end` strings and `buildDays` builds any span, so a month-length
-period needs no engine change. What is missing is **multiplicity and
-selection** — for "which period to open" to be a choice, more than one has to
-exist, and today there is exactly one with no picker. That is the next piece
-of work, not something the bidding or balances phases built.
+The engine models this directly: `Period` carries free `start`/`end` strings
+and `buildDays` builds any span, so a month-length period needs no engine
+change. Multiplicity and selection — many wars, a picker, an admin create
+sheet — were the piece of work that followed, and are built.
+
+### Reading a year: navigate, do not filter
+
+A year-long war cannot be read by dragging. A **month strip** above the grid
+gives one button per month the war covers — derived from its own span, so a
+quarter-long war gets three buttons and a month-long one gets a single
+button — and pressing one scrolls the grid so that month's first day lands
+just clear of the frozen columns.
+
+It **scrolls, it does not filter.** That is deliberate: narrowing the grid to
+one month would hide the manning counts either side of the boundary, and a
+leave clash across the turn of a month is exactly the thing this is meant to
+catch. The owner asked to see the whole year with a quick way to reach a
+month, and those two are the same requirement.
+
+The first entry points at the day the war **actually starts**, not the 1st of
+that month — a war beginning on the 12th has no column for the 1st, and
+jumping to a cell that is not rendered scrolls nowhere. The two frozen
+columns' width is measured live and taken off the target, because they are
+painted over the day cells and are a different width on a phone; without it,
+the month arrives on screen underneath them.
 
 ## The rules engine
 

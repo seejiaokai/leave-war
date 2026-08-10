@@ -17,9 +17,9 @@ describe('Matrix', () => {
     expect(within(row).getByText('OPSP')).toBeTruthy()
   })
 
-  it('renders a column for every day of the quarter', () => {
+  it('renders a column for every day of the year', () => {
     render(<Matrix />)
-    expect(screen.getAllByTestId(/^head-/)).toHaveLength(90)
+    expect(screen.getAllByTestId(/^head-/)).toHaveLength(365)
   })
 
   it('shows a code in the cell it belongs to', () => {

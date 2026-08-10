@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import {
   balanceOf,
   canDecide,
@@ -11,6 +11,7 @@ import {
   COUNTERS,
   counterLabel,
   isWeekend,
+  monthsIn,
   parseCell,
   raptorOwns,
   shiftedFrom,
@@ -56,6 +57,26 @@ export function Matrix() {
   const shown = COUNTERS[counter]
   const cycle = (by: number) => setCounter(c => (c + by + COUNTERS.length) % COUNTERS.length)
 
+  // Jumping to a month is how a year-long war is navigable at all: 365
+  // columns is roughly 13,600px, and nobody finds September by dragging.
+  const wrapRef = useRef<HTMLDivElement>(null)
+  const months = monthsIn(period.start, period.end)
+
+  const jumpTo = (date: string) => {
+    const wrap = wrapRef.current
+    const cell = wrap?.querySelector<HTMLElement>(`[data-testid="head-${date}"]`)
+    if (!wrap || !cell) return
+    // Measured live rather than read off the CSS custom properties: the two
+    // frozen columns change width at the phone breakpoint, and a hard-coded
+    // offset would land the target underneath them on one device and not
+    // the other. Scrolling BY a delta rather than TO an absolute keeps this
+    // correct wherever the grid happens to be scrolled already.
+    const frozen = ['.who', '.bal']
+      .map(sel => wrap.querySelector<HTMLElement>(sel)?.getBoundingClientRect().width ?? 0)
+      .reduce((a, b) => a + b, 0)
+    wrap.scrollLeft += cell.getBoundingClientRect().left - wrap.getBoundingClientRect().left - frozen
+  }
+
   const editing = canEdit(period.stage, role)
   const deciding = canDecide(period.stage, role)
 
@@ -79,8 +100,23 @@ export function Matrix() {
       <div className="card">
         <div className="card-hd">
           <span className="t">{period.name} · {dates.length} days · {people.length} aircrew</span>
+          {/* One button per month the war covers, so the strip fits a
+              quarter and a year alike without being told which it is. */}
+          <div className="months" data-testid="month-strip">
+            {months.map(m => (
+              <button
+                key={m.first}
+                className="mjump"
+                data-testid={`month-${m.label.replace(' ', '-')}`}
+                title={`Jump to ${m.label}`}
+                onClick={() => jumpTo(m.first)}
+              >
+                {m.label}
+              </button>
+            ))}
+          </div>
         </div>
-        <div className="mx-wrap">
+        <div className="mx-wrap" ref={wrapRef}>
           <table className="mx">
             <thead>
               <tr>

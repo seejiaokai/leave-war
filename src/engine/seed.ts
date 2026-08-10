@@ -44,8 +44,12 @@ export function seedPeople(): Person[] {
   }))
 }
 
+// A FULL YEAR, not a quarter. The squadron forecasts a quarter ahead, but the
+// war it forecasts inside runs the year — so the whole thing is on one sheet
+// and the month strip is how you get about it. 365 columns is 13,600px wide;
+// nobody scrolls to September by dragging.
 export function seedPeriod(): Period {
-  const days = buildDays('2026-01-01', '2026-03-31')
+  const days = buildDays('2026-01-01', '2026-12-31')
   for (const d of days) {
     if (d.date === '2026-01-01') {
       d.ph = true
@@ -63,8 +67,18 @@ export function seedPeriod(): Period {
       d.blocked = true
       d.blockedReason = 'Exercise week'
     }
+    // A second blocked week late in the year, so the month strip has
+    // somewhere worth navigating TO rather than only proving it moves.
+    if (d.date >= '2026-09-14' && d.date <= '2026-09-19') {
+      d.blocked = true
+      d.blockedReason = 'Exercise week'
+    }
+    if (d.date === '2026-08-09' || d.date === '2026-12-25') {
+      d.ph = true
+      d.events[0] = 'PH'
+    }
   }
-  return { id: 'q1-2026', name: 'JAN - MAR 26', start: '2026-01-01', end: '2026-03-31', stage: 'open', days }
+  return { id: 'y2026', name: 'JAN - DEC 26', start: '2026-01-01', end: '2026-12-31', stage: 'open', days }
 }
 
 export function seedRequirements(): Requirements {
@@ -204,28 +218,33 @@ export function seedLedger(): Ledger {
 //
 // The two do not overlap, and must not: a date belongs to at most one war.
 export function seedWars(): LeaveWar[] {
-  const q1 = makeWar('q1-2026', 'JAN - MAR 26', '2026-01-01', '2026-03-31')
-  q1.period = seedPeriod()
-  q1.grid = seedGrid()
-  q1.states = seedStates()
+  const y26 = makeWar('y2026', 'JAN - DEC 26', '2026-01-01', '2026-12-31')
+  y26.period = seedPeriod()
+  y26.grid = seedGrid()
+  y26.states = seedStates()
 
-  const q2 = makeWar('q2-2026', 'APR - JUN 26', '2026-04-01', '2026-06-30')
-  q2.grid = {
-    reset: { '2026-04-13': 'LL', '2026-04-14': 'LL', '2026-04-15': 'LL', '2026-04-16': 'LL' },
-    dusk: { '2026-05-04': 'OIL', '2026-05-05': '*LL' },
+  // Next year's war, in draft — the ordinary state of the one after the
+  // current, while its schedule is still being firmed up. It holds leave of
+  // its own so the cross-war balance rule has something to prove: RESET's
+  // four days here spend the same annual pool the 2026 screen draws on, and
+  // his figure must read the same from either.
+  const y27 = makeWar('y2027', 'JAN - DEC 27', '2027-01-01', '2027-12-31')
+  y27.grid = {
+    reset: { '2027-04-13': 'LL', '2027-04-14': 'LL', '2027-04-15': 'LL', '2027-04-16': 'LL' },
+    dusk: { '2027-05-04': 'OIL', '2027-05-05': '*LL' },
   }
-  q2.states = {
+  y27.states = {
     reset: {
-      '2026-04-13': { state: 'pending', source: 'bid' },
-      '2026-04-14': { state: 'pending', source: 'bid' },
-      '2026-04-15': { state: 'pending', source: 'bid' },
-      '2026-04-16': { state: 'pending', source: 'bid' },
+      '2027-04-13': { state: 'pending', source: 'bid' },
+      '2027-04-14': { state: 'pending', source: 'bid' },
+      '2027-04-15': { state: 'pending', source: 'bid' },
+      '2027-04-16': { state: 'pending', source: 'bid' },
     },
     dusk: {
-      '2026-05-04': { state: 'approved', source: 'raptor' },
-      '2026-05-05': { state: 'pending', source: 'bid' },
+      '2027-05-04': { state: 'approved', source: 'raptor' },
+      '2027-05-05': { state: 'pending', source: 'bid' },
     },
   }
 
-  return [q1, q2]
+  return [y26, y27]
 }

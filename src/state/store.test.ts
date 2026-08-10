@@ -23,7 +23,7 @@ beforeEach(() => {
 describe('store', () => {
   it('boots with the seeded roster and period', () => {
     expect(getState().people.length).toBeGreaterThan(0)
-    expect(getState().period.days).toHaveLength(90)
+    expect(getState().period.days).toHaveLength(365)
   })
 
   it('writes a cell into the grid', () => {
@@ -736,14 +736,14 @@ describe('more than one leave war', () => {
   it('boots with the first war on screen', () => {
     expect(getState().wars.length).toBeGreaterThan(1)
     expect(getState().currentId).toBe(getState().wars[0].period.id)
-    expect(getState().period.name).toBe('JAN - MAR 26')
+    expect(getState().period.name).toBe('JAN - DEC 26')
   })
 
   it('switches to another war, and the grid on screen switches with it', () => {
     const other = getState().wars[1].period.id
     selectWar(other)
     expect(getState().currentId).toBe(other)
-    expect(getState().period.name).toBe('APR - JUN 26')
+    expect(getState().period.name).toBe('JAN - DEC 27')
     // The Jan–Mar leave is no longer what `grid` answers with.
     expect(getState().grid.ramp?.['2026-01-01']).toBeUndefined()
   })
@@ -774,10 +774,10 @@ describe('more than one leave war', () => {
   it('writes into the war on screen, leaving the others untouched', () => {
     const [q1, q2] = getState().wars.map(w => w.period.id)
     selectWar(q2)
-    setCell('dusk', '2026-04-20', 'LL')
-    expect(getState().grid.dusk['2026-04-20']).toBe('LL')
+    setCell('dusk', '2027-04-20', 'LL')
+    expect(getState().grid.dusk['2027-04-20']).toBe('LL')
     selectWar(q1)
-    expect(getState().grid.dusk?.['2026-04-20']).toBeUndefined()
+    expect(getState().grid.dusk?.['2027-04-20']).toBeUndefined()
   })
 
   it('advances the stage of the war on screen only', () => {
@@ -800,8 +800,8 @@ describe('creating a leave war', () => {
   })
 
   it('creates one over any span, down to a single month', () => {
-    expect(createWar('JUL 26', '2026-07-01', '2026-07-31')).toBe('created')
-    const made = getState().wars.find(w => w.period.name === 'JUL 26')!
+    expect(createWar('JUL 28', '2028-07-01', '2028-07-31')).toBe('created')
+    const made = getState().wars.find(w => w.period.name === 'JUL 28')!
     expect(made.period.days).toHaveLength(31)
     expect(made.grid).toEqual({})
   })
@@ -810,9 +810,9 @@ describe('creating a leave war', () => {
   // quarter's war should not yank the admin off the one they are working in.
   it('starts it in draft and leaves the current war on screen', () => {
     const before = getState().currentId
-    createWar('JUL 26', '2026-07-01', '2026-07-31')
+    createWar('JUL 28', '2028-07-01', '2028-07-31')
     expect(getState().currentId).toBe(before)
-    expect(getState().wars.find(w => w.period.name === 'JUL 26')!.period.stage).toBe('draft')
+    expect(getState().wars.find(w => w.period.name === 'JUL 28')!.period.stage).toBe('draft')
   })
 
   // A date belongs to at most one war, or a person could hold leave on it
@@ -824,16 +824,16 @@ describe('creating a leave war', () => {
   })
 
   it('allows a span that begins the day after another ends', () => {
-    expect(createWar('JUL 26', '2026-07-01', '2026-07-31')).toBe('created')
+    expect(createWar('JUL 28', '2028-07-01', '2028-07-31')).toBe('created')
   })
 
   it('refuses a range that ends before it starts', () => {
-    expect(createWar('BACKWARDS', '2026-07-31', '2026-07-01')).toBe('backwards')
+    expect(createWar('BACKWARDS', '2028-07-31', '2028-07-01')).toBe('backwards')
     expect(getState().wars.every(w => w.period.name !== 'BACKWARDS')).toBe(true)
   })
 
   it('refuses a war with no name', () => {
-    expect(createWar('   ', '2026-07-01', '2026-07-31')).toBe('unnamed')
+    expect(createWar('   ', '2028-07-01', '2028-07-31')).toBe('unnamed')
   })
 
   // Creating a leave war is an admin act. A member has no business making
@@ -841,13 +841,13 @@ describe('creating a leave war', () => {
   // hidden — the switch that hides it is unguarded.
   it('refuses a member, not just hides the button', () => {
     setRole('member')
-    expect(createWar('JUL 26', '2026-07-01', '2026-07-31')).toBe('forbidden')
-    expect(getState().wars.every(w => w.period.name !== 'JUL 26')).toBe(true)
+    expect(createWar('JUL 28', '2028-07-01', '2028-07-31')).toBe('forbidden')
+    expect(getState().wars.every(w => w.period.name !== 'JUL 28')).toBe(true)
   })
 
   it('gives every war a distinct id, even for two wars named alike', () => {
-    createWar('JUL 26', '2026-07-01', '2026-07-31')
-    createWar('JUL 26', '2026-08-01', '2026-08-31')
+    createWar('JUL 28', '2028-07-01', '2028-07-31')
+    createWar('JUL 28', '2028-08-01', '2028-08-31')
     const ids = getState().wars.map(w => w.period.id)
     expect(new Set(ids).size).toBe(ids.length)
   })
@@ -856,9 +856,9 @@ describe('creating a leave war', () => {
     const backend = memoryBackend()
     initStore(backend)
     setRole('admin')
-    createWar('JUL 26', '2026-07-01', '2026-07-31')
+    createWar('JUL 28', '2028-07-01', '2028-07-31')
     initStore(backend)
-    expect(getState().wars.some(w => w.period.name === 'JUL 26')).toBe(true)
+    expect(getState().wars.some(w => w.period.name === 'JUL 28')).toBe(true)
   })
 
   it('does not notify when a creation is refused', () => {
@@ -887,14 +887,14 @@ describe('reading stored wars', () => {
     const backend = memoryBackend()
     backend.write('wars', stored(war('a', '2026-01-01', '2026-03-31'), war('b', '2026-03-31', '2026-06-30')))
     initStore(backend)
-    expect(getState().wars.map(w => w.period.id)).toEqual(['q1-2026', 'q2-2026'])
+    expect(getState().wars.map(w => w.period.id)).toEqual(['y2026', 'y2027'])
   })
 
   it('rejects two wars sharing an id', () => {
     const backend = memoryBackend()
     backend.write('wars', stored(war('a', '2026-01-01', '2026-03-31'), war('a', '2026-04-01', '2026-06-30')))
     initStore(backend)
-    expect(getState().wars.map(w => w.period.id)).toEqual(['q1-2026', 'q2-2026'])
+    expect(getState().wars.map(w => w.period.id)).toEqual(['y2026', 'y2027'])
   })
 
   it.each([
@@ -906,7 +906,7 @@ describe('reading stored wars', () => {
     backend.write('wars', raw)
     initStore(backend)
     expect(getState().wars).toHaveLength(2)
-    expect(getState().period.name).toBe('JAN - MAR 26')
+    expect(getState().period.name).toBe('JAN - DEC 26')
   })
 
   it('rejects a war whose stage is not one of the cycle', () => {
@@ -915,7 +915,7 @@ describe('reading stored wars', () => {
     w.period.stage = 'reopened'
     backend.write('wars', stored(w))
     initStore(backend)
-    expect(getState().period.name).toBe('JAN - MAR 26')
+    expect(getState().period.name).toBe('JAN - DEC 26')
   })
 
   it('rejects a war whose range runs backwards', () => {
@@ -924,7 +924,7 @@ describe('reading stored wars', () => {
     w.period.end = '2025-12-01'
     backend.write('wars', stored(w))
     initStore(backend)
-    expect(getState().period.name).toBe('JAN - MAR 26')
+    expect(getState().period.name).toBe('JAN - DEC 26')
   })
 
   // A day carries events, a blocked flag and its reason — facts the date

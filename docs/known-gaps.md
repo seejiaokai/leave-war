@@ -100,6 +100,16 @@ things are deliberately absent:
 - **Nothing stops a war being created in the past**, or a hundred of them.
   There is no sanity bound on the dates beyond "end not before start" and
   "no overlap".
+- **The seeded wars now cover the whole of 2026 and 2027**, one year each,
+  because the owner reads the year at once (10 Aug 26). A consequence worth
+  knowing before writing a test: **there is no free date nearer than 2028**,
+  so anything creating a war has to reach that far out or be refused for
+  overlap. Two e2e tests and several store tests moved for exactly this.
+- **A month is only navigation, never a filter.** The strip scrolls the year
+  to a month; it does not narrow the grid to it. That was the owner's ask —
+  see the whole year, jump to a month — and it matters because a filter would
+  hide the manning counts either side of a boundary, which is where a leave
+  clash actually shows up.
 
 ## Removing a leave type is a breaking data change
 
@@ -186,12 +196,15 @@ test code needs to change.
   does. Now slightly larger a trap than it was, since a bare `initStore()`
   would read `leavewar:states`, `leavewar:stage`, `leavewar:role`,
   `leavewar:openings` and `leavewar:ledger` from the same store.
-- The DOM ceiling in the geometry gate is 2500 against a measured 2357.
-  Raising it is meant to be a deliberate edit in whichever change adds the
-  nodes, not a reflex when it goes red. Note the selector's blind spot: it
-  counts `.mx *`, and the bid sheet renders outside the table, so it adds
-  nothing to that figure. The same test therefore also counts the whole
-  document with the sheet open (2413, ceiling 2600).
+- The DOM ceiling in the geometry gate is **9600 against a measured 9241**,
+  raised from 2500/2357 on 10 Aug 26 when the war became a year rather than a
+  quarter. Raising it is meant to be a deliberate edit in whichever change
+  adds the nodes, not a reflex when it goes red. Note the selector's blind
+  spot: it counts `.mx *`, and the bid sheet renders outside the table, so it
+  adds nothing to that figure. The same test therefore also counts the whole
+  document with the sheet open (9278, ceiling 9700). It now carries a **lower**
+  bound of 8000 as well, so a grid that quietly shrank back to a quarter fails
+  instead of passing comfortably.
 - `setCell` stores an empty row object for a person whose last state is
   cleared, so `states.ramp` can be `{}` rather than absent. Every reader uses
   `stateOf`, which is indifferent, and `initStore` prunes empty rows on the

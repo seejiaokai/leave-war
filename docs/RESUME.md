@@ -1,11 +1,11 @@
 # Start here
 
 LEAVE WAR is a leave-bidding system for a fighter squadron, replacing a
-spreadsheet the squadron uses to bid for leave a quarter ahead. This file says
+spreadsheet the squadron uses to bid for leave ahead of time. This file says
 where the work stopped and what comes next, so a session picking it up cold does
 not have to reconstruct it from `git log`.
 
-**State as of 10 Aug 26.** 405 unit tests, 56 Playwright runs (28 tests across
+**State as of 10 Aug 26.** 416 unit tests, 62 Playwright runs (31 tests across
 a phone and a desktop project), clean build, all verified first-hand. Work sits
 on `claude/bidding-plan-continuation-vqnrfz`, branched from `main`.
 
@@ -31,6 +31,18 @@ bids inside it. An admin creates one over any span — down to a single month �
 and it lands in draft; a picker in the topbar switches between them. A date
 belongs to at most one war, and **a balance counts leave from every war**,
 because entitlements are continuous and wars are only windows onto them.
+
+**A war is a whole year on screen, with a month strip to navigate it**
+(owner's ask, 10 Aug 26: see the entire year, with a quick jump to a month).
+The seeded wars are Jan–Dec 26 and Jan–Dec 27. The strip scrolls, it never
+filters — narrowing to one month would hide the manning counts either side of
+a boundary, which is where a clash shows. 365 columns is ~13,600px and ~9,200
+DOM nodes; that was **measured in a browser before the change was adopted**
+(687–757ms to load, 296–355ms for a bid round-trip, both viewports), not
+after. Two consequences: the geometry gate's node ceiling was raised
+deliberately to 9600 against 9241, and **no date before 2028 is free**, so
+anything creating a new war has to reach that far out or be refused for
+overlap.
 
 **Both directions of the Raptor sync are modelled**, though neither wire
 exists. Leave entered on Raptor's input tab arrives already approved — putting
@@ -109,6 +121,12 @@ That has now caught, across two branches:
   `initStore` twice with no write between them, so nothing was ever saved and
   it never round-tripped through storage. It passed against a loader that
   discarded every day.
+- **A fifth, and a dead branch with it**, in the month strip: `monthsIn` began
+  with `if (end < start) return []`, and a probe showed the branch could never
+  change the answer — the loop condition `d <= end` is already false on the
+  first pass. The guard is gone; the test stays, re-aimed at the mutation that
+  *can* kill it (a month-index rewrite, which returns one bogus entry), and
+  seen red against exactly that.
 
 And three defects found only by **measuring or looking in a real browser**,
 which is why the geometry gate is not optional decoration:
@@ -144,8 +162,8 @@ Both are in `docs/known-gaps.md` with the reasoning:
 ```
 npm install
 npm run dev                 # or: npm run build && npx vite preview --port 4173
-npx vitest run              # 405 tests
-npm run test:e2e            # 56 runs, phone and desktop
+npx vitest run              # 416 tests
+npm run test:e2e            # 62 runs, phone and desktop
 npm run build               # typecheck + production build
 ```
 

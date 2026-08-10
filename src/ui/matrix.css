@@ -110,12 +110,6 @@
   background: var(--panel);
 }
 
-/* Phone: the balance column has to be PAID for, not added on top. Below this
-   width the callsign column gives back what the counter column takes, so the
-   number of visible day columns is roughly unchanged — a counter panel that
-   left four days on screen would be a worse app than no counters at all.
-   The category chip drops rather than wrapping: it is secondary information
-
 /* The sticky date header. z-index 3 on the corner cell so it keeps
    winning the stacking order over both the sticky header row and the
    sticky column beneath it. */
@@ -371,4 +365,34 @@
     letter-spacing: 0;
     font-size: 9.5px;
   }
+}
+
+/* The month strip. A year-long war is ~13,600px wide, so this is not a
+   convenience — it is the only practical way to reach September. It wraps
+   rather than scrolling: twelve short labels fit two lines on a phone, and a
+   strip that itself needed scrolling would be a second navigation problem
+   sitting on top of the first. */
+.months {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.mjump {
+  background: var(--panel-2);
+  border: 1px solid var(--edge);
+  color: var(--ink-3);
+  border-radius: 7px;
+  padding: 3px 8px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.mjump:hover {
+  border-color: rgba(59, 198, 232, .5);
+  color: var(--accent);
 }

@@ -128,21 +128,92 @@ test('the matrix stays within a sane DOM size', async ({ page }) => {
   // count row, plus the header and its two arrows — taking the figure to
   // 2357, measured 2026-08-09. That is one cell per row and cannot grow
   // with the number of counters, which is the point of a single cycling
-  // column. Ceiling stays at 2500: still headroom, not a target.
+  // column.
+  //
+  // THE CEILING WAS THEN RAISED FROM 2500 TO 9600, DELIBERATELY. The war is
+  // now a whole year rather than a quarter, because that is how the owner
+  // reads it — so the same grid is 365 columns instead of 90 and the node
+  // count is four times what it was. Measured 2026-08-10 BEFORE writing the
+  // number here, on both projects: 9241 inside `.mx`, 9278 whole-document
+  // with a sheet open, and a load of 687-757ms with a bid round-trip of
+  // 296-355ms. That cost was measured first and the year adopted second;
+  // had it come out at seconds, the year would not have shipped.
+  //
+  // The headroom principle is unchanged: this is a ceiling, not a target,
+  // and raising it is a deliberate edit in the change that adds the nodes.
   const nodes = await page.evaluate(() => document.querySelectorAll('.mx *').length)
   // A missing `.mx` would make this 0, which is comfortably "less than the
   // ceiling" — assert it's also nonzero so an absent grid fails loudly
-  // instead of passing by accident.
-  expect(nodes).toBeGreaterThan(0)
-  expect(nodes).toBeLessThan(2500)
+  // instead of passing by accident. The lower bound is a real floor too: a
+  // grid that quietly went back to a quarter would sit near 2357 and this
+  // would catch it.
+  expect(nodes).toBeGreaterThan(8000)
+  expect(nodes).toBeLessThan(9600)
 
   await page.locator('[data-testid="cell-dusk-2026-02-11"]').click()
   await expect(page.locator('[data-testid="bid-picker"]')).toBeVisible()
-  // 2413 whole-document nodes with the sheet open, measured 2026-08-09
-  // (2357 of them the matrix). Ceiling 2600 on the same headroom principle.
+  // 9278 whole-document nodes with the sheet open (9241 of them the matrix),
+  // measured 2026-08-10. Ceiling 9700 on the same principle. The gap between
+  // the two figures is the app chrome and the sheet — about 37 nodes — and
+  // it is the sheet's unbounded growth this half of the test watches.
   const all = await page.evaluate(() => document.querySelectorAll('*').length)
   expect(all).toBeGreaterThan(nodes)
-  expect(all).toBeLessThan(2600)
+  expect(all).toBeLessThan(9700)
+})
+
+// A year is ~13,600px of grid. Reaching September by dragging is not a thing
+// anybody will do, so the month strip is what makes a year-long war usable at
+// all — which makes it load-bearing, not decoration. jsdom computes no layout
+// and cannot scroll, so the unit tests prove the arithmetic against stated
+// rectangles and NOTHING about whether the grid actually moves. Only here.
+test('a month button scrolls the grid to that month', async ({ page }) => {
+  const wrap = page.locator('.mx-wrap')
+  expect(await wrap.evaluate(el => el.scrollLeft)).toBe(0)
+
+  await page.locator('[data-testid="month-SEP"]').click()
+  const scrolled = await wrap.evaluate(el => el.scrollLeft)
+  expect(scrolled).toBeGreaterThan(5000)
+
+  // Landing near the month is not enough: the day has to be ON SCREEN and
+  // clear of the two frozen columns, which are painted OVER the day cells.
+  // A jump that forgot their width would put 1 September underneath the
+  // callsign column, where it is scrolled-to and invisible at the same time.
+  const head = (await page.locator('[data-testid="head-2026-09-01"]').boundingBox())!
+  const bal = (await page.locator('.mx thead th.bal').boundingBox())!
+  expect(head.x).toBeGreaterThanOrEqual(bal.x + bal.width - 1)
+  const wrapBox = (await wrap.boundingBox())!
+  expect(head.x + head.width).toBeLessThanOrEqual(wrapBox.x + wrapBox.width + 1)
+})
+
+// Pressing a second month from wherever the first one left the grid is the
+// ordinary way this gets used, and it is the case an absolute `scrollLeft =`
+// gets wrong once the grid is already scrolled.
+test('a month button works from wherever the grid already is', async ({ page }) => {
+  await page.locator('[data-testid="month-SEP"]').click()
+  const atSep = await page.locator('.mx-wrap').evaluate(el => el.scrollLeft)
+  await page.locator('[data-testid="month-MAR"]').click()
+  const atMar = await page.locator('.mx-wrap').evaluate(el => el.scrollLeft)
+  expect(atMar).toBeLessThan(atSep)
+
+  const head = (await page.locator('[data-testid="head-2026-03-01"]').boundingBox())!
+  const bal = (await page.locator('.mx thead th.bal').boundingBox())!
+  expect(head.x).toBeGreaterThanOrEqual(bal.x + bal.width - 1)
+})
+
+// The strip has to be reachable on a phone without itself becoming a
+// scrolling problem — twelve buttons that ran off the right edge would just
+// move the navigation problem up one level.
+test('the whole month strip is on screen at phone width', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 664 })
+  const strip = page.locator('[data-testid="month-strip"]')
+  await expect(strip).toBeVisible()
+  const overflows = await strip.evaluate(el => el.scrollWidth > el.clientWidth + 1)
+  expect(overflows).toBe(false)
+  for (const m of ['JAN', 'JUN', 'DEC']) {
+    const box = (await page.locator(`[data-testid="month-${m}"]`).boundingBox())!
+    expect(box.x).toBeGreaterThanOrEqual(0)
+    expect(box.x + box.width).toBeLessThanOrEqual(390)
+  }
 })
 
 test('the three bid states are three distinguishable colours', async ({ page }) => {
@@ -387,8 +458,8 @@ test('switching leave war repaints the grid and keeps the balance', async ({ pag
   await expect(page.locator('[data-testid="cell-ramp-2026-01-01"]')).toHaveText('OL')
   const before = await page.locator('[data-testid="bal-reset"]').textContent()
 
-  await page.selectOption('[data-testid="war-picker"]', { label: 'APR - JUN 26' })
-  await expect(page.locator('[data-testid="cell-reset-2026-04-13"]')).toHaveText('LL')
+  await page.selectOption('[data-testid="war-picker"]', { label: 'JAN - DEC 27' })
+  await expect(page.locator('[data-testid="cell-reset-2027-04-13"]')).toHaveText('LL')
   await expect(page.locator('[data-testid="cell-ramp-2026-01-01"]')).toHaveCount(0)
 
   // Entitlements are continuous and wars are windows onto them, so the
@@ -424,17 +495,21 @@ test('the new-leave-war sheet is anchored to the viewport, not the topbar', asyn
   expect(box.y).toBeGreaterThan(bar.y + bar.height)
 })
 
+// A single month, deliberately: the owner settled that a period is any range
+// they choose, down to one month, and this is the short end of that. The
+// dates are in 2028 because the two seeded wars now cover the whole of 2026
+// and 2027 — with year-long wars there is no free month any nearer.
 test('an admin creates a leave war, and it joins the picker', async ({ page }) => {
   await page.locator('[data-testid="role-toggle"]').click()
   await page.locator('[data-testid="war-new"]').click()
-  await page.fill('[data-testid="war-name"]', 'JUL 26')
-  await page.fill('[data-testid="war-start"]', '2026-07-01')
-  await page.fill('[data-testid="war-end"]', '2026-07-31')
+  await page.fill('[data-testid="war-name"]', 'JUL 28')
+  await page.fill('[data-testid="war-start"]', '2028-07-01')
+  await page.fill('[data-testid="war-end"]', '2028-07-31')
   await page.locator('[data-testid="war-create"]').click()
 
   await expect(page.locator('[data-testid="war-sheet"]')).toHaveCount(0)
   await expect(page.locator('[data-testid="war-picker"] option')).toHaveText([
-    'JAN - MAR 26', 'APR - JUN 26', 'JUL 26',
+    'JAN - DEC 26', 'JAN - DEC 27', 'JUL 28',
   ])
 })
 

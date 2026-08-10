@@ -29,11 +29,15 @@ describe('seed', () => {
     expect(new Set(ids).size).toBe(ids.length)
   })
 
-  it('covers the first quarter of 2026', () => {
+  // The seeded war is a WHOLE YEAR, not a quarter. A quarter was the first
+  // shape this took, and it is still the common case in the reference
+  // workbook — but the owner reads the year at once and jumps to a month to
+  // navigate, so the seed has to be the thing they actually look at.
+  it('covers the whole of 2026', () => {
     const period = seedPeriod()
     expect(period.start).toBe('2026-01-01')
-    expect(period.end).toBe('2026-03-31')
-    expect(period.days).toHaveLength(90)
+    expect(period.end).toBe('2026-12-31')
+    expect(period.days).toHaveLength(365)
   })
 
   it('marks New Year as a public holiday and blocks at least one day', () => {

@@ -13,7 +13,7 @@ describe('switching leave war', () => {
   it('lists every war, with the current one selected', () => {
     render(<Topbar />)
     const picker = screen.getByTestId('war-picker') as HTMLSelectElement
-    expect([...picker.options].map(o => o.textContent)).toEqual(['JAN - MAR 26', 'APR - JUN 26'])
+    expect([...picker.options].map(o => o.textContent)).toEqual(['JAN - DEC 26', 'JAN - DEC 27'])
     expect(picker.value).toBe(getState().wars[0].period.id)
   })
 
@@ -22,7 +22,7 @@ describe('switching leave war', () => {
     fireEvent.change(screen.getByTestId('war-picker'), {
       target: { value: getState().wars[1].period.id },
     })
-    expect(getState().period.name).toBe('APR - JUN 26')
+    expect(getState().period.name).toBe('JAN - DEC 27')
   })
 
   // The matrix has to follow. It reads `period`, `grid` and `states` from the
@@ -33,7 +33,7 @@ describe('switching leave war', () => {
     expect(screen.getByTestId('cell-ramp-2026-01-01').textContent).toBe('OL')
     act(() => selectWar(getState().wars[1].period.id))
     expect(screen.queryByTestId('cell-ramp-2026-01-01')).toBeNull()
-    expect(screen.getByTestId('cell-reset-2026-04-13').textContent).toBe('LL')
+    expect(screen.getByTestId('cell-reset-2027-04-13').textContent).toBe('LL')
   })
 
   // A balance is the same figure whichever war is being looked at, because
@@ -71,23 +71,23 @@ describe('creating a leave war', () => {
     setRole('admin')
     render(<Topbar />)
     fireEvent.click(screen.getByTestId('war-new'))
-    fireEvent.change(screen.getByTestId('war-name'), { target: { value: 'JUL 26' } })
-    fireEvent.change(screen.getByTestId('war-start'), { target: { value: '2026-07-01' } })
-    fireEvent.change(screen.getByTestId('war-end'), { target: { value: '2026-07-31' } })
+    fireEvent.change(screen.getByTestId('war-name'), { target: { value: 'JUL 28' } })
+    fireEvent.change(screen.getByTestId('war-start'), { target: { value: '2028-07-01' } })
+    fireEvent.change(screen.getByTestId('war-end'), { target: { value: '2028-07-31' } })
     fireEvent.click(screen.getByTestId('war-create'))
 
-    expect(getState().wars.some(w => w.period.name === 'JUL 26')).toBe(true)
+    expect(getState().wars.some(w => w.period.name === 'JUL 28')).toBe(true)
     const picker = screen.getByTestId('war-picker') as HTMLSelectElement
-    expect([...picker.options].map(o => o.textContent)).toContain('JUL 26')
+    expect([...picker.options].map(o => o.textContent)).toContain('JUL 28')
   })
 
   it('closes the sheet once the war is made', () => {
     setRole('admin')
     render(<Topbar />)
     fireEvent.click(screen.getByTestId('war-new'))
-    fireEvent.change(screen.getByTestId('war-name'), { target: { value: 'JUL 26' } })
-    fireEvent.change(screen.getByTestId('war-start'), { target: { value: '2026-07-01' } })
-    fireEvent.change(screen.getByTestId('war-end'), { target: { value: '2026-07-31' } })
+    fireEvent.change(screen.getByTestId('war-name'), { target: { value: 'JUL 28' } })
+    fireEvent.change(screen.getByTestId('war-start'), { target: { value: '2028-07-01' } })
+    fireEvent.change(screen.getByTestId('war-end'), { target: { value: '2028-07-31' } })
     fireEvent.click(screen.getByTestId('war-create'))
     expect(screen.queryByTestId('war-sheet')).toBeNull()
   })
@@ -112,8 +112,8 @@ describe('creating a leave war', () => {
     render(<Topbar />)
     fireEvent.click(screen.getByTestId('war-new'))
     fireEvent.change(screen.getByTestId('war-name'), { target: { value: 'BACK' } })
-    fireEvent.change(screen.getByTestId('war-start'), { target: { value: '2026-07-31' } })
-    fireEvent.change(screen.getByTestId('war-end'), { target: { value: '2026-07-01' } })
+    fireEvent.change(screen.getByTestId('war-start'), { target: { value: '2028-07-31' } })
+    fireEvent.change(screen.getByTestId('war-end'), { target: { value: '2028-07-01' } })
     fireEvent.click(screen.getByTestId('war-create'))
     expect(screen.getByTestId('war-problem').textContent).toBeTruthy()
   })
@@ -123,10 +123,10 @@ describe('creating a leave war', () => {
     render(<Topbar />)
     fireEvent.click(screen.getByTestId('war-new'))
     expect(screen.getByTestId('war-create').hasAttribute('disabled')).toBe(true)
-    fireEvent.change(screen.getByTestId('war-name'), { target: { value: 'JUL 26' } })
+    fireEvent.change(screen.getByTestId('war-name'), { target: { value: 'JUL 28' } })
     expect(screen.getByTestId('war-create').hasAttribute('disabled')).toBe(true)
-    fireEvent.change(screen.getByTestId('war-start'), { target: { value: '2026-07-01' } })
-    fireEvent.change(screen.getByTestId('war-end'), { target: { value: '2026-07-31' } })
+    fireEvent.change(screen.getByTestId('war-start'), { target: { value: '2028-07-01' } })
+    fireEvent.change(screen.getByTestId('war-end'), { target: { value: '2028-07-31' } })
     expect(screen.getByTestId('war-create').hasAttribute('disabled')).toBe(false)
   })
 
@@ -137,9 +137,9 @@ describe('creating a leave war', () => {
     render(<Topbar />)
     const before = getState().currentId
     fireEvent.click(screen.getByTestId('war-new'))
-    fireEvent.change(screen.getByTestId('war-name'), { target: { value: 'JUL 26' } })
-    fireEvent.change(screen.getByTestId('war-start'), { target: { value: '2026-07-01' } })
-    fireEvent.change(screen.getByTestId('war-end'), { target: { value: '2026-07-31' } })
+    fireEvent.change(screen.getByTestId('war-name'), { target: { value: 'JUL 28' } })
+    fireEvent.change(screen.getByTestId('war-start'), { target: { value: '2028-07-01' } })
+    fireEvent.change(screen.getByTestId('war-end'), { target: { value: '2028-07-31' } })
     fireEvent.click(screen.getByTestId('war-create'))
     expect(getState().currentId).toBe(before)
   })

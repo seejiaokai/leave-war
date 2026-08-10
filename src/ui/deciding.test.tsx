@@ -275,7 +275,7 @@ describe('shifting a bid', () => {
     fireEvent.click(screen.getByTestId(PENDING))
     const input = screen.getByTestId('shift-date')
     expect(input.getAttribute('min')).toBe('2026-01-01')
-    expect(input.getAttribute('max')).toBe('2026-03-31')
+    expect(input.getAttribute('max')).toBe('2026-12-31')
   })
 
   // The second half of the move. Management approves the date they moved it
