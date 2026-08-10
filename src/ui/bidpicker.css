@@ -176,3 +176,9 @@
   color: #F2C879;
   flex-basis: 100%;
 }
+
+/* The war name is free text, so it needs room the date fields do not. */
+.bidsheet .namein {
+  flex: 1 1 200px;
+  min-width: 140px;
+}

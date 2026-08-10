@@ -380,3 +380,73 @@ test('nothing in the callsign column is cut off', async ({ page }) => {
   const count = await page.locator('.mx .who').count()
   expect(count).toBeGreaterThan(10)
 })
+
+// ---- more than one leave war ----
+
+test('switching leave war repaints the grid and keeps the balance', async ({ page }) => {
+  await expect(page.locator('[data-testid="cell-ramp-2026-01-01"]')).toHaveText('OL')
+  const before = await page.locator('[data-testid="bal-reset"]').textContent()
+
+  await page.selectOption('[data-testid="war-picker"]', { label: 'APR - JUN 26' })
+  await expect(page.locator('[data-testid="cell-reset-2026-04-13"]')).toHaveText('LL')
+  await expect(page.locator('[data-testid="cell-ramp-2026-01-01"]')).toHaveCount(0)
+
+  // Entitlements are continuous and wars are windows onto them, so the
+  // figure is the same from either screen. RESET's four days sit in Apr–Jun
+  // and take him to −2 annual, which reads −2 from Jan–Mar too.
+  await expect(page.locator('[data-testid="bal-reset"]')).toHaveText(before!)
+  expect(before).toBe('-2')
+})
+
+// The create sheet renders OUTSIDE `.topbar` because that element carries
+// `backdrop-filter`, which makes it the containing block for any
+// `position: fixed` descendant — the sheet would otherwise resolve its
+// `bottom` against a 60px-tall bar and appear clipped at the top of the
+// page. Every unit test passed while it was broken: jsdom computes no
+// layout at all. This is the test that caught it.
+test('the new-leave-war sheet is anchored to the viewport, not the topbar', async ({ page }) => {
+  await page.locator('[data-testid="role-toggle"]').click()
+  await page.locator('[data-testid="war-new"]').click()
+
+  const sheet = page.locator('[data-testid="war-sheet"]')
+  await expect(sheet).toBeVisible()
+
+  const box = (await sheet.boundingBox())!
+  const view = page.viewportSize()!
+  expect(box.y).toBeGreaterThanOrEqual(0)
+  expect(box.y + box.height).toBeLessThanOrEqual(view.height + 1)
+  // Anchored near the BOTTOM, which is where every other sheet sits and
+  // where a thumb already is on a phone. Clipped by the topbar it would sit
+  // at the very top instead.
+  expect(box.y).toBeGreaterThan(view.height / 2)
+
+  const bar = (await page.locator('.topbar').boundingBox())!
+  expect(box.y).toBeGreaterThan(bar.y + bar.height)
+})
+
+test('an admin creates a leave war, and it joins the picker', async ({ page }) => {
+  await page.locator('[data-testid="role-toggle"]').click()
+  await page.locator('[data-testid="war-new"]').click()
+  await page.fill('[data-testid="war-name"]', 'JUL 26')
+  await page.fill('[data-testid="war-start"]', '2026-07-01')
+  await page.fill('[data-testid="war-end"]', '2026-07-31')
+  await page.locator('[data-testid="war-create"]').click()
+
+  await expect(page.locator('[data-testid="war-sheet"]')).toHaveCount(0)
+  await expect(page.locator('[data-testid="war-picker"] option')).toHaveText([
+    'JAN - MAR 26', 'APR - JUN 26', 'JUL 26',
+  ])
+})
+
+test('overlapping dates are refused, with the reason on screen', async ({ page }) => {
+  await page.locator('[data-testid="role-toggle"]').click()
+  await page.locator('[data-testid="war-new"]').click()
+  await page.fill('[data-testid="war-name"]', 'CLASH')
+  await page.fill('[data-testid="war-start"]', '2026-05-01')
+  await page.fill('[data-testid="war-end"]', '2026-08-31')
+  await page.locator('[data-testid="war-create"]').click()
+
+  await expect(page.locator('[data-testid="war-problem"]')).toBeVisible()
+  await expect(page.locator('[data-testid="war-sheet"]')).toBeVisible()
+  await expect(page.locator('[data-testid="war-picker"] option')).toHaveCount(2)
+})

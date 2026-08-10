@@ -223,3 +223,36 @@
   border-color: rgba(178, 77, 234, .55);
   color: #D9A6F5;
 }
+
+/* The leave war picker. Styled as the `.wk` chip it replaces so the topbar
+   reads unchanged, but it is a real <select> — the one control that behaves
+   on a phone, a desktop and a keyboard alike without any geometry of its
+   own. */
+.warpick {
+  font-family: inherit;
+  cursor: pointer;
+  appearance: none;
+  padding-right: 26px;
+  background-image: linear-gradient(45deg, transparent 50%, #A8E6BC 50%),
+    linear-gradient(135deg, #A8E6BC 50%, transparent 50%);
+  background-position: calc(100% - 14px) 50%, calc(100% - 9px) 50%;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+}
+
+.warnew {
+  background: transparent;
+  border: 1px solid var(--edge);
+  color: var(--ink-3);
+  padding: 6px 11px;
+  border-radius: 11px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.warnew:hover {
+  border-color: rgba(59, 198, 232, .5);
+  color: var(--accent);
+}

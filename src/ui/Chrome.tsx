@@ -3,15 +3,19 @@
 // yet (My leave, Ledger, Rules, Roster) and no "closes in N days", which
 // the engine does not model. See CLAUDE-facing restyle brief for why.
 
+import { useState } from 'react'
 import { evaluatePeriod, nextStage, stageLabel } from '../engine'
-import { advanceStage, getState, setRole } from '../state/store'
+import { advanceStage, getState, selectWar, setRole } from '../state/store'
+import { WarSheet } from './WarSheet'
 import { useVersion } from './useStore'
 import './chrome.css'
 
 export function Topbar() {
   useVersion()
-  const { period } = getState()
+  const { period, wars, role } = getState()
+  const [making, setMaking] = useState(false)
   return (
+    <>
     <div className="topbar">
       <div className="mark">
         <svg className="rglyph" width="22" height="22" viewBox="0 0 24 24" fill="none">
@@ -27,9 +31,45 @@ export function Topbar() {
         <span className="on">Leave war</span>
       </nav>
       <div className="spring">
-        <span className="wk on">{period.name}</span>
+        {/* A native select rather than a popover: it is the one control that
+            works the same on a phone, a desktop and a keyboard, and it needs
+            no geometry of its own inside a page that already has a scroller
+            and three sheets.
+
+            Each option is the war's NAME only. Adding its stage would widen
+            the closed chip to whatever the longest label is, and the stage
+            strip immediately below already names the current war's — so the
+            cost lands on every phone screen to answer a question only
+            someone mid-switch is asking. */}
+        <select
+          className="wk on warpick"
+          data-testid="war-picker"
+          aria-label="Which leave war"
+          value={period.id}
+          onChange={e => selectWar(e.target.value)}
+        >
+          {wars.map(w => (
+            <option key={w.period.id} value={w.period.id}>
+              {w.period.name}
+            </option>
+          ))}
+        </select>
+        {role === 'admin' && (
+          <button className="warnew" data-testid="war-new" onClick={() => setMaking(true)}>
+            + New
+          </button>
+        )}
       </div>
     </div>
+    {/* OUTSIDE `.topbar`, and that is load-bearing rather than tidiness.
+        `.topbar` carries `backdrop-filter`, which makes it the containing
+        block for any `position: fixed` descendant — so the sheet's
+        `bottom: 14px` would resolve against the topbar's own 60px-tall box
+        and render clipped at the top of the page instead of at the bottom of
+        the viewport. jsdom computes no layout, so every unit test passed
+        while it was broken; the browser gate is what caught it. */}
+    {making && <WarSheet onClose={() => setMaking(false)} />}
+    </>
   )
 }
 
