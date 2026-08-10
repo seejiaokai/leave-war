@@ -485,3 +485,23 @@
   border-color: rgba(59, 198, 232, .5);
   color: var(--accent);
 }
+
+/* The callsign as a control, for an admin. Inherits the cell's own type and
+   colour rather than styling itself, so the row reads identically whether it
+   is editable or not — a member and an admin must see the same roster, not
+   two different-looking ones. */
+.mx .who .whoedit {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  letter-spacing: inherit;
+  text-align: left;
+  cursor: pointer;
+  width: 100%;
+}
+
+.mx .who .whoedit:hover {
+  color: var(--accent);
+}

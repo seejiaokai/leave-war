@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { categoryOf, inSquadron, type Person } from './people'
+import { categoryLabel, categoryOf, inSquadron, type Person } from './people'
 
 const person = (over: Partial<Person> = {}): Person => ({
   id: 'p1',
@@ -47,5 +47,30 @@ describe('inSquadron', () => {
     expect(inSquadron(p, '2026-01-09')).toBe(false)
     expect(inSquadron(p, '2026-01-15')).toBe(true)
     expect(inSquadron(p, '2026-01-21')).toBe(false)
+  })
+})
+
+describe('categoryLabel', () => {
+  const someone = (seat: Person['seat'], band: Person['band'], sxo: boolean): Person =>
+    ({ id: 'x', callsign: 'X', seat, band, sxo, from: null, to: null })
+
+  // The owner's ask: "if they are SXO qualified they will have a (S) tagged
+  // to it. Like IW(S)."
+  it('tags an SXO with (S) and leaves everyone else alone', () => {
+    expect(categoryLabel(someone('wso', 'instructor', true))).toBe('IWSO(S)')
+    expect(categoryLabel(someone('wso', 'instructor', false))).toBe('IWSO')
+    expect(categoryLabel(someone('pilot', 'ops', true))).toBe('OPSP(S)')
+  })
+
+  // SXO sits ON TOP of a category, never instead of one — a requirement of
+  // "2 pilots, 2 WSOs, 1 SXO" needs the same person counted twice. So the
+  // label decorates what `categoryOf` returns and never replaces it, and
+  // everything that counts or requires a category is untouched.
+  it('decorates the category rather than replacing it', () => {
+    for (const [seat, band] of [['pilot', 'ops'], ['pilot', 'instructor'], ['wso', 'ops'], ['wso', 'instructor']] as const) {
+      const p = someone(seat, band, true)
+      expect(categoryLabel(p).startsWith(categoryOf(p))).toBe(true)
+      expect(categoryOf(p)).toBe(categoryOf({ ...p, sxo: false }))
+    }
   })
 })

@@ -25,6 +25,20 @@ export function categoryOf(p: Person): Category {
   return p.band === 'instructor' ? 'IWSO' : 'OPSW'
 }
 
+/**
+ * The category as the grid shows it, with `(S)` appended for an SXO.
+ *
+ * The owner's ask, 10 Aug 26: "if they are SXO qualified they will have a (S)
+ * tagged to it. Like IW(S)." SXO sits ON TOP of a category rather than
+ * instead of one — a requirement of "2 pilots, 2 WSOs, 1 SXO" needs the same
+ * person counted twice — so this decorates the category rather than replacing
+ * it, and `categoryOf` is untouched. Everything that counts, sorts or
+ * requires a category goes on reading the plain one; only the label differs.
+ */
+export function categoryLabel(p: Person): string {
+  return p.sxo ? `${categoryOf(p)}(S)` : categoryOf(p)
+}
+
 // Plain string comparison is correct for `yyyy-mm-dd`: the format sorts
 // lexicographically in date order, so no parsing (and no timezone) is involved.
 export function inSquadron(p: Person, date: string): boolean {

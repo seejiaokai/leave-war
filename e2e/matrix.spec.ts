@@ -929,3 +929,31 @@ test('swiping the day columns leaves the counter alone', async ({ page }, testIn
   await swipe(page, { x: cell.x + cell.width / 2, y: cell.y + cell.height / 2 }, -120)
   expect(await page.locator('[data-testid="counter-name"]').textContent()).toBe('ANNUAL')
 })
+
+// The roster sheet: seat, band and SXO. The category is never edited — it is
+// derived from the first two, which is what lets Raptor's roster replace this
+// one without a migration.
+test('an admin edits who somebody is, and the grid follows', async ({ page }) => {
+  await page.locator('[data-testid="role-toggle"]').click()
+  await page.locator('[data-testid="person-tata"]').click()
+  await expect(page.locator('[data-testid="person-sheet"]')).toBeVisible()
+  await expect(page.locator('[data-testid="person-category"]')).toHaveText('IP')
+
+  await page.locator('[data-testid="person-sxo"]').click()
+  await expect(page.locator('[data-testid="person-category"]')).toHaveText('IP(S)')
+  await expect(page.locator('[data-testid="person-tata"]')).toContainText('IP(S)')
+})
+
+// The (S) has to FIT. The callsign column is 76px on a phone and already
+// clipped a label once — the tag adds three characters to every SXO's
+// category, and `overflow: hidden` would hide the failure rather than show
+// it.
+test('the SXO tag is not clipped in the callsign column on a phone', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 760 })
+  const cut = await page.locator('[data-testid="row-ramp"] .who').evaluate(el => ({
+    over: el.scrollWidth > el.clientWidth + 1,
+    text: el.textContent,
+  }))
+  expect(cut.text).toContain('OPSP(S)')
+  expect(cut.over).toBe(false)
+})

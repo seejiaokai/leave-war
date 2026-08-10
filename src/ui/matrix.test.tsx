@@ -14,7 +14,11 @@ describe('Matrix', () => {
     render(<Matrix />)
     const row = screen.getByTestId('row-ramp')
     expect(within(row).getByText('RAMP')).toBeTruthy()
-    expect(within(row).getByText('OPSP')).toBeTruthy()
+    // RAMP is the seed's one SXO, so his category carries the (S) tag. TATA
+    // is not, so his does not — asserted alongside, or a build that appended
+    // (S) to everybody would pass this just as happily.
+    expect(within(row).getByText('OPSP(S)')).toBeTruthy()
+    expect(within(screen.getByTestId('row-tata')).getByText('IP')).toBeTruthy()
   })
 
   it('renders a column for every day of the year', () => {

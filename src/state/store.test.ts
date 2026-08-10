@@ -12,6 +12,7 @@ import {
   setRole,
   setBidWindow,
   setCellRange,
+  setPerson,
   clearBidWindow,
   shiftBid,
   subscribe,
@@ -1190,5 +1191,75 @@ describe('writing leave over a range', () => {
     for (const d of ['2026-02-09', '2026-02-10', '2026-02-11']) {
       expect(getState().grid.dusk?.[d]).toBeUndefined()
     }
+  })
+})
+
+describe('editing the roster', () => {
+  beforeEach(() => {
+    initStore(memoryBackend())
+  })
+
+  it('refuses a member', () => {
+    expect(setPerson('tata', { seat: 'wso' })).toBe(false)
+    expect(getState().people.find(p => p.id === 'tata')!.seat).toBe('pilot')
+  })
+
+  it('changes seat, band and SXO for an admin', () => {
+    setRole('admin')
+    expect(setPerson('tata', { seat: 'wso', band: 'ops', sxo: true })).toBe(true)
+    const tata = getState().people.find(p => p.id === 'tata')!
+    expect(tata).toMatchObject({ seat: 'wso', band: 'ops', sxo: true })
+  })
+
+  it('ignores a person who does not exist, without notifying', () => {
+    setRole('admin')
+    const before = getVersion()
+    expect(setPerson('nobody', { sxo: true })).toBe(false)
+    expect(getVersion()).toBe(before)
+  })
+
+  it('leaves everyone else untouched', () => {
+    setRole('admin')
+    const others = getState().people.filter(p => p.id !== 'tata').map(p => ({ ...p }))
+    setPerson('tata', { sxo: true })
+    expect(getState().people.filter(p => p.id !== 'tata')).toEqual(others)
+  })
+
+  it('persists the roster and reads it back', () => {
+    const backend = memoryBackend()
+    initStore(backend)
+    setRole('admin')
+    setPerson('tata', { seat: 'wso', sxo: true })
+    initStore(backend)
+    expect(getState().people.find(p => p.id === 'tata')).toMatchObject({ seat: 'wso', sxo: true })
+  })
+
+  // Same rule as every other stored shape here: a blob that is not the shape
+  // this app writes is not trusted, and the seed is the fallback.
+  it.each([
+    ['a seat nothing recognises', [{ id: 'a', callsign: 'A', seat: 'gunner', band: 'ops', sxo: false, from: null, to: null }]],
+    ['a band nothing recognises', [{ id: 'a', callsign: 'A', seat: 'pilot', band: 'ace', sxo: false, from: null, to: null }]],
+    ['sxo as a string', [{ id: 'a', callsign: 'A', seat: 'pilot', band: 'ops', sxo: 'yes', from: null, to: null }]],
+    ['a missing posting-out field', [{ id: 'a', callsign: 'A', seat: 'pilot', band: 'ops', sxo: false, from: null }]],
+    ['two people sharing an id', [
+      { id: 'a', callsign: 'A', seat: 'pilot', band: 'ops', sxo: false, from: null, to: null },
+      { id: 'a', callsign: 'B', seat: 'wso', band: 'ops', sxo: false, from: null, to: null },
+    ]],
+    ['an empty roster', []],
+  ])('falls back to the seeded roster when the stored one has %s', (_label, stored) => {
+    const backend = memoryBackend()
+    backend.write('people', JSON.stringify(stored))
+    initStore(backend)
+    expect(getState().people.length).toBeGreaterThan(10)
+    expect(getState().people.find(p => p.id === 'tata')).toBeTruthy()
+  })
+
+  it('keeps a well-formed stored roster', () => {
+    const backend = memoryBackend()
+    backend.write('people', JSON.stringify([
+      { id: 'solo', callsign: 'SOLO', seat: 'wso', band: 'instructor', sxo: true, from: null, to: null },
+    ]))
+    initStore(backend)
+    expect(getState().people.map(p => p.id)).toEqual(['solo'])
   })
 })

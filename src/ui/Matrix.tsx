@@ -3,7 +3,7 @@ import {
   balanceOf,
   canDecide,
   canEditCell,
-  categoryOf,
+  categoryLabel,
   codeOf,
   evaluatePeriod,
   inSquadron,
@@ -22,6 +22,7 @@ import {
 import { getState } from '../state/store'
 import { BidPicker, DecisionSheet, RaptorSheet } from './BidPicker'
 import { CounterSheet } from './CounterSheet'
+import { PersonSheet } from './PersonSheet'
 import { CountRows } from './CountRows'
 import { useVersion } from './useStore'
 import './matrix.css'
@@ -58,6 +59,7 @@ export function Matrix() {
   // OIL — which is worse than no panel at all.
   const [counter, setCounter] = useState(0)
   const [picking, setPicking] = useState(false)
+  const [editingWho, setEditing] = useState<string | null>(null)
   const shown = COUNTERS[counter]
   const cycle = (by: number) => setCounter(c => (c + by + COUNTERS.length) % COUNTERS.length)
 
@@ -222,9 +224,27 @@ export function Matrix() {
             <tbody>
               {people.map(p => (
                 <tr key={p.id} data-testid={`row-${p.id}`}>
+                  {/* The callsign opens the person sheet for an admin, and
+                      is plain text for everyone else. `IWSO(S)` rather than a
+                      second column for SXO: it sits on top of a category, so
+                      it decorates the label rather than replacing it. */}
                   <td className="who">
-                    {p.callsign}
-                    <span className="cat">{categoryOf(p)}</span>
+                    {role === 'admin' ? (
+                      <button
+                        className="whoedit"
+                        data-testid={`person-${p.id}`}
+                        title={`Edit ${p.callsign}`}
+                        onClick={() => setEditing(p.id)}
+                      >
+                        {p.callsign}
+                        <span className="cat">{categoryLabel(p)}</span>
+                      </button>
+                    ) : (
+                      <>
+                        {p.callsign}
+                        <span className="cat">{categoryLabel(p)}</span>
+                      </>
+                    )}
                   </td>
                   {/* Derived on every render rather than cached: the figure
                       has to move the instant a bid is placed, because a
@@ -371,6 +391,12 @@ export function Matrix() {
           leave to a closed sheet without a second control. */}
       {picking && (
         <CounterSheet shown={shown} onPick={setCounter} onClose={() => setPicking(false)} />
+      )}
+      {editingWho && people.some(p => p.id === editingWho) && (
+        <PersonSheet
+          person={people.find(p => p.id === editingWho)!}
+          onClose={() => setEditing(null)}
+        />
       )}
       {open && !raptorOwns(states, open.id, open.date)
         && canEditCell(period, role, open.date)

@@ -179,6 +179,41 @@ const COUNTER_NAMES = new Set<string>(COUNTERS)
 // dangerous shape here rather than merely a wrong one: NaN propagates
 // silently through every sum it touches, so a single bad leaf would turn a
 // whole column of balances into "NaN" with nothing to say why.
+const SEATS = new Set(['pilot', 'wso'])
+const BANDS = new Set(['instructor', 'ops'])
+
+/**
+ * The roster, validated leaf by leaf.
+ *
+ * A person carries no `category` — it is derived from seat and band — so a
+ * stored blob that names one is from a shape this app never wrote and is
+ * rejected along with every other malformed one. `from`/`to` are `null` or a
+ * date string; a person with neither field would silently be in the squadron
+ * forever, which is exactly the sort of quiet wrong the seed fallback exists
+ * to prevent.
+ */
+function readPeople(x: unknown): Person[] | null {
+  if (!Array.isArray(x) || x.length === 0) return null
+  const out: Person[] = []
+  const seen = new Set<string>()
+  for (const p of x) {
+    if (!isPlainObject(p)) return null
+    const { id, callsign, seat, band, sxo, from, to } = p
+    if (typeof id !== 'string' || !id || typeof callsign !== 'string') return null
+    if (typeof seat !== 'string' || !SEATS.has(seat)) return null
+    if (typeof band !== 'string' || !BANDS.has(band)) return null
+    if (typeof sxo !== 'boolean') return null
+    if (from !== null && typeof from !== 'string') return null
+    if (to !== null && typeof to !== 'string') return null
+    // Two people sharing an id share a grid row and a React key — the same
+    // shape `readWars` refuses for wars, and for the same reason.
+    if (seen.has(id)) return null
+    seen.add(id)
+    out.push({ id, callsign, seat: seat as Person['seat'], band: band as Person['band'], sxo, from, to })
+  }
+  return out
+}
+
 function readOpenings(x: unknown): Openings | null {
   if (!isPlainObject(x)) return null
   const out: Openings = {}
@@ -340,13 +375,14 @@ export function initStore(b?: StorageBackend): void {
     ? (storedCurrent as string)
     : wars[0].period.id
 
+  const people = readStored('people', readPeople) ?? seedPeople()
   const openings = readStored('openings', readOpenings) ?? seedOpenings()
   const ledger = readStored('ledger', readLedger) ?? seedLedger()
 
   const storedRole = backend.read('role')
   const role = storedRole === 'member' || storedRole === 'admin' ? storedRole : state.role
 
-  state = withCurrent({ ...state, wars, currentId, openings, ledger, role })
+  state = withCurrent({ ...state, people, wars, currentId, openings, ledger, role })
 
   version = 0
   listeners.clear()
@@ -404,6 +440,7 @@ function persist(): void {
   backend.write('role', state.role)
   backend.write('openings', JSON.stringify(state.openings))
   backend.write('ledger', JSON.stringify(state.ledger))
+  backend.write('people', JSON.stringify(state.people))
 }
 
 /**
@@ -428,6 +465,31 @@ function updateCurrent(fn: (war: LeaveWar) => LeaveWar): void {
   if (quiet) return
   persist()
   notify()
+}
+
+/**
+ * Change a person's seat, band or SXO qualification.
+ *
+ * Admin-only, and checked here rather than trusted to a hidden control, for
+ * the same reason `createWar` re-checks it: the role switch is an affordance,
+ * so the store is the only place it can mean anything.
+ *
+ * The CATEGORY is not settable and never will be — it is derived from seat
+ * and band by `categoryOf`, which is what lets Raptor's roster replace this
+ * one without a migration. A setter for it would create a second version of
+ * a fact the two systems have to agree on.
+ */
+export function setPerson(id: string, patch: Partial<Pick<Person, 'seat' | 'band' | 'sxo'>>): boolean {
+  if (state.role !== 'admin') return false
+  const person = state.people.find(p => p.id === id)
+  if (!person) return false
+  state = withCurrent({
+    ...state,
+    people: state.people.map(p => (p.id === id ? { ...p, ...patch } : p)),
+  })
+  persist()
+  notify()
+  return true
 }
 
 /** Switch which role the interface is being used as. Unguarded on purpose:
