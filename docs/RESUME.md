@@ -180,22 +180,37 @@ never reached anyone. Everything is built so that change lands in
 `src/state/storage.ts` and nowhere else — but that seam currently has
 `read`/`write` only, and pushing will want a third verb.
 
+**Design it for both apps at once.** Raptor has now been read (see below) and
+it has no server either — it is a static Pages deploy whose persistence sits
+behind one injectable `localStorage` backend, the same seam in the same shape
+as ours. The old plan was to build against Raptor's backend; there is none to
+build against, so the honest move is one backend replacing both seams rather
+than two that later have to be reconciled. **Read the Raptor section below
+before starting**, and expect to write the contract document first.
+
 Then, in rough order:
 
 - **The rest of balances.** Earned OIL is blocked on data, not effort: the
   half/full rule turns on knock-off time and nothing here carries one. The
   grant sheet and the ledger view are also unbuilt, so a number on screen
   cannot yet be opened and explained.
-- **The Raptor contract document**, now that both directions are specified.
+- **The Raptor contract document**, now that both directions are specified
+  AND Raptor's own side has been read. It has two concrete obstacles waiting
+  in it, neither of them "add a field" — see below.
 
-Four smaller debts are in `docs/known-gaps.md`: the day verdict is computed
+Five smaller debts are in `docs/known-gaps.md`: the day verdict is computed
 and still not shown in words, `title` tooltips still do not exist on touch, a
-cell is not reachable from the keyboard, and the sheets are `role="dialog"`
-without a focus trap, focus restore or an Escape key.
+cell is not reachable from the keyboard, the sheets are `role="dialog"`
+without a focus trap, focus restore or an Escape key, and the date header
+stopped sticking when the grid gave up its own vertical scroller.
 
 ## Handing off
 
-Three things a new session cannot find anywhere else in this repo.
+Four things a new session cannot find anywhere else in this repo.
+
+**Every change ends merged into `main`.** The owner asked for it on 10 Aug 26
+and it is written up in `CLAUDE.md` with its gate. Do not skip it and do not
+merge red — see that file before your first commit.
 
 **The owner reviews from a published link**, and it is the same one each time:
 
@@ -207,6 +222,14 @@ will never change. A session that did not publish it itself must pass this
 URL as the Artifact tool's `url` argument. Republish after any change worth
 their looking at — a description of a screen is not a screen.
 
+Two traps, both hit on 10 Aug 26. A container restore can leave the checkout
+a commit BEHIND the remote, so the page you build may be missing the very
+change you just made; **rebuild and compare the file byte-for-byte against
+`dist/` before publishing**, which is how a 940-byte-short page was caught
+after it had already gone out. And publishing needs the artifact read first
+(WebFetch it) when the session did not publish it — the tool refuses
+otherwise.
+
 **The link is the built app inlined into one self-contained page**, because
 the host blocks every external request. Build, then put the single
 `dist/assets/*.css` into a `<style>` and the single `dist/assets/*.js` into an
@@ -215,20 +238,52 @@ inline `<script type="module">`, escaping `</script` in the bundle; add a
 the host supplies those. It comes out around 250KB. The app paints its own
 background in `theme.css`, so the page holds on either host theme.
 
-**Raptor has not been read, and the owner has asked about it.** They gave the
-repo — `seejiaokai/Raptor`, pages at `seejiaokai.github.io/Raptor` — and were
-told, correctly, that everything said so far about the merge is this repo
-keeping its own side of the bargain: the engine is DOM-free, the only runtime
-dependencies are `react` and `react-dom`, and the palette is Raptor's own,
-copied from its `scheduler.css`. Whether the merge is a move rather than a
-rewrite cannot be answered from here.
+## Raptor, read at last — and what it means for the backend
 
-**Read it before starting the backend**, because the answers change that
-piece of work more than anything else: is Raptor React and which version, is
-it TypeScript, what build tool, what holds its state — and above all, does it
-already have a server and accounts. If it does, "shared and real time" is a
-much smaller job than starting from nothing, and it should be built against
-Raptor's rather than invented beside it.
+The previous handoff said Raptor had not been read and listed the questions
+that would size the next phase. It has now been read (`seejiaokai/raptor`,
+clone it under `/workspace/`; the git proxy serves public repos anonymously).
+The answers, taken from its source rather than assumed:
+
+- **The stack is identical to this one.** React 19.2.8, TypeScript, Vite,
+  Vitest, Playwright, and `react`/`react-dom` as the only runtime
+  dependencies. Its build is the same `tsc -b && vite build`. A merge is
+  plausibly a move rather than a rewrite.
+- **Its store is the same shape as ours** — one version counter and a
+  listener set, its own comment saying it is "shaped for React's
+  `useSyncExternalStore`", which is exactly what `src/ui/useStore.ts` reads.
+- **It has NO server.** Deployed as a static GitHub Pages artifact, no
+  `fetch`, no WebSocket, and persistence is `localStorage` behind an
+  injectable backend — the same seam this app has in `src/state/storage.ts`.
+- **It has accounts, but not the kind that helps.** `src/state/auth.ts` holds
+  a hardcoded `ACCOUNTS` object with plaintext passwords in the bundle and two
+  roles (`admin`, `main`), plus a `ME` "view as" person — the very thing this
+  app deliberately did not fake. It is an affordance model, exactly like ours.
+
+**So "shared and real time" is greenfield for both, and it should be designed
+once.** The old handoff hoped Raptor already had a server that this app could
+be built against; it does not. What it does have is the same seam in the same
+place, so one real backend can replace `storage.ts` here and Raptor's
+`storeBackend` there. That is the single most useful thing to know before
+starting the next phase.
+
+Two obstacles specific to the leave data, read off Raptor's `inputs.ts`:
+
+- **Three leave types against this app's eight.** `LEAVE_TYPES` is
+  `{LL, OL, OIL}`. `CCL`, `FCL`, `PL`, `EL` and `OFF` have nowhere to land.
+  Each also needs Raptor's *island* ruling: `isLocalLeave` is true for `LL`
+  and `OIL` only, and it decides whether a man on leave may still be raised as
+  an SC SPARE. Five new types means five new answers, and it is the owner's
+  call rather than a mechanical port.
+- **A portion is subtler than "add a field".** Raptor already carries partial
+  days — `allday: false` with `s`/`e` as minutes from midnight — but its leave
+  path ignores them: `dayOff()` tests `isAway(inp)` on the TYPE alone, so any
+  leave input closes the whole day whatever the window says. A `*LL` sent
+  across today would land as a full day away, silently. The work is teaching
+  Raptor's availability that leave has a size, not finding somewhere to put it.
+
+None of this has been discussed with the owner and nothing has been built
+against it. The Raptor contract document is where it belongs.
 
 ## How this project has actually found its defects
 
@@ -304,6 +359,33 @@ was never compiled. See `docs/known-gaps.md` for how to kill it.
 The space arithmetic that justified the counter column was **also wrong on
 paper** — it read 30px day columns off `min-width` where they render at 41px.
 The conclusion held, but only measurement showed why.
+
+Three more, on 10 Aug 26, none of which the suite would ever have told you:
+
+- **A contrast RATIO cannot see the defect the owner reported.** The green
+  chips measured ~10.9:1 by luminance — AAA — and were still hard to read,
+  because ink and field shared a hue and left the eye no edge. The gate now
+  asserts the ink is near-NEUTRAL rather than asserting a number, because the
+  number was already passing while the problem was on screen.
+- **A gate that fails at its own guard is worth more than one that passes.**
+  Giving the grid up as a vertical scroller killed the sticky date header. The
+  old test asserted the header held still while the wrapper scrolled — and it
+  failed on `expect(scrollTop).toBeGreaterThan(0)`, the guard its author added
+  precisely so "nothing moved" could never read as "it held still". Without
+  that line the change would have shipped with the header quietly broken.
+- **A flaky suite is not a gate.** After the year-long war landed, most
+  interface tests render 365 columns and ~9,200 nodes, and the suite began
+  failing about one run in three against vitest's 5s default — always a
+  different test, always at 5–8s, always green alone. The timeout is now 20s
+  (`vite.config.ts`) with the reasoning written beside it. If ordinary tests
+  ever approach that again, make the rendering cheaper rather than raising the
+  number.
+
+Two of this session's own tests were **wrong rather than the code**, which is
+the failure mode to expect here: one asserted the month at the grid's left
+edge when the code correctly reports the month filling the screen, and one
+wrote a bid into June without noticing the seeded bidding window stops at
+March, so it was testing the window and not the list.
 
 ## Two things not to relitigate
 
