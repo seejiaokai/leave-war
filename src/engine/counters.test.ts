@@ -16,12 +16,13 @@ const pending = { state: 'pending' as const, source: 'bid' as const }
 const refused = { state: 'refused' as const, source: 'bid' as const }
 
 describe('COUNTERS', () => {
-  // SEVEN, not eight. LL and OL both spend the annual pool, so a list of
-  // leave TYPES would show the same figure twice under two names — and it
-  // would grow every time a ninth type was added, which the counter list
-  // does not.
-  it('is the seven entitlements, not the eight leave types', () => {
-    expect(COUNTERS).toEqual(['annual', 'oil', 'ccl', 'pcl', 'pl', 'el', 'fcl'])
+  // SIX counters against SEVEN leave types. LL and OL both spend the annual
+  // pool, so a list of leave TYPES would show the same figure twice under two
+  // names — and it would grow every time a type was added, which the counter
+  // list does not. Both figures moved together when FCL was removed on
+  // 10 Aug 26, without this list being edited: it is derived, not restated.
+  it('is the six entitlements, one fewer than the leave types', () => {
+    expect(COUNTERS).toEqual(['annual', 'oil', 'ccl', 'pcl', 'pl', 'el'])
   })
 
   it('has a label for every counter', () => {

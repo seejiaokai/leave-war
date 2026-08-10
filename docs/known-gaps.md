@@ -16,6 +16,14 @@ the next phase of work. Until it lands this is a prototype the owner can judge,
 not a tool the squadron can use — the spreadsheet at least sits where everyone
 can open it.
 
+**What it has to become (owner, 10 Aug 26): everyone sees the same grid in
+real time.** An input appears for everybody as it is made, and so does every
+change of state — a cell going green or red as it is decided. That is a
+stronger bar than "shared": it rules out a design where each browser reads a
+snapshot and only notices someone else's bid on reload, which is the shape a
+plain REST store would give. Whatever replaces `storage.ts` has to push, not
+just persist.
+
 Everything is built to make that change small: all persistence goes through one
 module (`src/state/storage.ts`), and every write goes through one function
 (`setCell`). Nothing else in the codebase touches either.
@@ -77,6 +85,20 @@ says every change to a counter is a ledger entry, and **leave taken is not
 posted to the ledger here**. The grid is already that record, and a second
 copy of it would be a second version of the truth. The ledger holds only what
 the grid cannot know.
+
+## Removing a leave type is a breaking data change
+
+`FCL` was removed on 10 Aug 26. The counter list is derived from the code
+catalogue, so its counter went with it and no other file needed editing —
+but **stored balances that still name a removed counter are rejected on
+load**, and `openings` or `ledger` falls back to the seed entire rather than
+dropping just the stale entries.
+
+That is the established rule for every stored shape here (an unknown value
+means the blob is not trustworthy), and it is the right default while this is
+one browser's own storage. It stops being acceptable when the shared backend
+lands and a removed code could discard a squadron's real balances: at that
+point a removal needs a migration, not a fallback.
 
 ## The RAPTOR clash has nowhere to go
 

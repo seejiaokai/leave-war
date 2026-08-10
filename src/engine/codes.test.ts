@@ -26,7 +26,7 @@ describe('parseCell', () => {
   })
 
   it('parses every leave type', () => {
-    for (const type of ['LL', 'OL', 'OIL', 'CCL', 'PCL', 'PL', 'EL', 'FCL']) {
+    for (const type of ['LL', 'OL', 'OIL', 'CCL', 'PCL', 'PL', 'EL']) {
       expect(parseCell(type)).toEqual({ type, portion: 'full' })
     }
   })
@@ -125,7 +125,7 @@ describe('formatCell', () => {
 
 describe('codeOf', () => {
   it('makes a half day cost half a person, not a whole one', () => {
-    // Iterates all eight leave types rather than just LL and OIL: the
+    // Iterates all seven leave types rather than just LL and OIL: the
     // implementation is generic over `type`, so a future change that wrongly
     // special-cased one leave type would slip past a test that only ever
     // checked two of them.

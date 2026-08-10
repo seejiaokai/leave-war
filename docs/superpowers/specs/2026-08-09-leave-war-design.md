@@ -103,7 +103,6 @@ Every code carries four facts, replacing today's "any text means gone":
 | `PCL` | parentcare leave | 1.0 | PCL | — | yes |
 | `PL` | paternity leave | 1.0 | PL | — | yes |
 | `EL` | embarkation leave | 1.0 | EL | — | yes |
-| `FCL` | own counter | 1.0 | FCL | — | yes |
 | `M` | medical (HL/ATT C) | 1.0 | — | — | no |
 | `HL` | hospitalisation leave | 1.0 | — | — | no |
 | `CSE` | course | 1.0 | — | — | no |
@@ -114,9 +113,11 @@ Every code carries four facts, replacing today's "any text means gone":
 The code list is configurable — adding one is data, not a code change — in the
 same way RAPTOR's stores list is configurable.
 
-`FCL`'s expansion was not confirmed by the owner; its behaviour was (its own
-counter, removes the day). The label is editable, so a wrong expansion costs
-nothing to fix.
+**`FCL` was removed on 10 Aug 26** at the owner's instruction. It had been
+carried here with its behaviour known (own counter, removes the day) but its
+expansion never confirmed — a code nobody could say the meaning of, and a
+counter nobody could reconcile. Removing it took its counter with it, because
+the counter list is derived from this table rather than restated beside it.
 
 ### SC duty and the counts
 
@@ -129,7 +130,7 @@ while making the reason visible.
 ## Counters
 
 Rather than a fixed set of balances, a person carries a **named counter per
-entitlement**: annual leave, OIL, CCL, PCL, PL, EL, FCL, and any added later.
+entitlement**: annual leave, OIL, CCL, PCL, PL, EL, and any added later.
 Each spending code names the counter it draws from. A new entitlement next year
 is configuration.
 

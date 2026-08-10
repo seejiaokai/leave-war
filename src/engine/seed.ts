@@ -168,7 +168,7 @@ export function seedOpenings(): Openings {
     cross: { annual: -12, oil: 1 },
     decal: { annual: 5, oil: -4.5 },
     skin: { annual: 13, oil: 2 },
-    slammed: { annual: 3, oil: 0, fcl: 2 },
+    slammed: { annual: 3, oil: 0 },
     cage: { annual: 16, oil: 1 },
     reset: { annual: 2, oil: 8 },
   }

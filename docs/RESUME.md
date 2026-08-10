@@ -5,8 +5,8 @@ spreadsheet the squadron uses to bid for leave a quarter ahead. This file says
 where the work stopped and what comes next, so a session picking it up cold does
 not have to reconstruct it from `git log`.
 
-**State as of 9 Aug 26.** 336 unit tests, 48 Playwright runs (24 tests across a
-phone and a desktop project), clean build, all verified first-hand. Work sits on
+**State as of 10 Aug 26.** 336 unit tests, 48 Playwright runs (24 tests across
+a phone and a desktop project), clean build, all verified first-hand. Work sits on
 `claude/bidding-plan-continuation-vqnrfz`, branched from `main`.
 
 ## What exists
@@ -22,7 +22,7 @@ editing; an admin approves, refuses **or moves** each bid; the period walks
 draft → open → closed → published, forward only.
 
 **Balances are on screen**, including on a phone, which was the hard part.
-Seven counters, one frozen column showing one of them at a time, cycled from
+Six counters, one frozen column showing one of them at a time, cycled from
 its own header. A pending bid draws its counter down immediately, so nobody
 can ask for leave they have already asked for; a refusal gives it back.
 
@@ -52,11 +52,15 @@ Four rulings are visible on screen rather than merely written down:
 
 ## Next
 
-**The shared backend.** It has been the one thing blocking squadron use since
-the beginning, and this branch sharpened it: a bid nobody else can see is not
-a bid, and an approval in a private browser store is a decision that never
-reached anyone. Everything is built so that change lands in
-`src/state/storage.ts` and nowhere else.
+**The shared backend, and it has to be REAL TIME** (owner, 10 Aug 26).
+Everyone sees the same grid as inputs are made, and sees cells turn green or
+red as they are decided. That is a stronger bar than "shared" and rules out a
+snapshot-on-reload design. It has been the one thing blocking squadron use
+since the beginning, and this branch sharpened it: a bid nobody else can see
+is not a bid, and an approval in a private browser store is a decision that
+never reached anyone. Everything is built so that change lands in
+`src/state/storage.ts` and nowhere else — but that seam currently has
+`read`/`write` only, and pushing will want a third verb.
 
 Then, in rough order:
 

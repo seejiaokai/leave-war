@@ -12,7 +12,7 @@ beforeEach(() => {
 describe('the counter column', () => {
   it('shows one counter at a time, not one column per counter', () => {
     render(<Matrix />)
-    // One header cell for the counter column, whatever the seven hold.
+    // One header cell for the counter column, whatever the six hold.
     expect(screen.getAllByTestId(/^counter-head$/)).toHaveLength(1)
     expect(screen.getAllByTestId(/^bal-/)).toHaveLength(getState().people.length)
   })
@@ -41,18 +41,18 @@ describe('the counter column', () => {
     expect(screen.getByTestId('bal-ramp').textContent).toBe('2.5')
   })
 
-  it('walks forward and back through all seven, wrapping at each end', () => {
+  it('walks forward and back through all six, wrapping at each end', () => {
     render(<Matrix />)
     const seen: string[] = []
     for (let i = 0; i < COUNTERS.length; i++) {
       seen.push(screen.getByTestId('counter-name').textContent!)
       fireEvent.click(screen.getByTestId('counter-next'))
     }
-    expect(seen).toEqual(['ANNUAL', 'OIL', 'CCL', 'PCL', 'PL', 'EL', 'FCL'])
+    expect(seen).toEqual(['ANNUAL', 'OIL', 'CCL', 'PCL', 'PL', 'EL'])
     // Wrapped back to the start.
     expect(screen.getByTestId('counter-name').textContent).toBe('ANNUAL')
     fireEvent.click(screen.getByTestId('counter-prev'))
-    expect(screen.getByTestId('counter-name').textContent).toBe('FCL')
+    expect(screen.getByTestId('counter-name').textContent).toBe('EL')
   })
 
   // §Counters: balances already go negative in the squadron's own workbook,

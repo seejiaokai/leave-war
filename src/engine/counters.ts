@@ -25,12 +25,13 @@ import { codeOf, LEAVE_TYPES, type CounterName } from './codes'
 /**
  * The counters, in the order the interface cycles them.
  *
- * SEVEN, not eight: `LL` and `OL` both spend the annual pool, so a list of
- * leave types would show the same figure twice under two names. Derived from
- * the catalogue rather than written out again, so a ninth leave type naming
- * a new counter appears here without anyone remembering this file. Frozen
- * for the same reason `STAGE_ORDER` is — an exported array is mutable by
- * whoever imports it.
+ * One fewer than there are leave types: `LL` and `OL` both spend the annual
+ * pool, so a list of leave types would show the same figure twice under two
+ * names. Derived from the catalogue rather than written out again, so a leave
+ * type added or removed changes this list without anyone remembering the
+ * file — removing `FCL` on 10 Aug 26 took its counter with it and needed no
+ * edit here. Frozen for the same reason `STAGE_ORDER` is: an exported array
+ * is mutable by whoever imports it.
  */
 export const COUNTERS: readonly CounterName[] = Object.freeze(
   [...new Set(LEAVE_TYPES.map(t => t.counter))],
@@ -43,7 +44,6 @@ const LABEL: Record<CounterName, string> = {
   pcl: 'PCL',
   pl: 'PL',
   el: 'EL',
-  fcl: 'FCL',
 }
 
 export function counterLabel(counter: CounterName): string {

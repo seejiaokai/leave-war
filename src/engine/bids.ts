@@ -69,7 +69,7 @@ export function shiftedFrom(states: States, personId: string, date: string): str
  *  happen to someone; leave is asked for.
  *
  *  Reads `bid` off the code catalogue rather than holding a list here, so
- *  the eight leave types stay defined in exactly one place — a ninth added
+ *  the seven leave types stay defined in exactly one place — one added
  *  to `LEAVE_TYPES` becomes biddable without anyone remembering this file. */
 export function isBiddable(code: string | undefined | null): boolean {
   return codeOf(code)?.bid ?? false

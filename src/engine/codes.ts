@@ -16,7 +16,7 @@
 // an abbreviation like the old `HO` — is what is stored, typed and read back
 // from a CSV.
 
-export type CounterName = 'annual' | 'oil' | 'ccl' | 'pcl' | 'pl' | 'el' | 'fcl'
+export type CounterName = 'annual' | 'oil' | 'ccl' | 'pcl' | 'pl' | 'el'
 
 export type Portion = 'full' | 'am' | 'pm'
 
@@ -32,9 +32,14 @@ export interface LeaveType {
   counter: CounterName
 }
 
-// The eight leave types. All are biddable and all spend a counter — that is
-// what makes them leave rather than a marker. Exported so a future bid
-// picker can list them without duplicating this table.
+// The seven leave types. All are biddable and all spend a counter — that is
+// what makes them leave rather than a marker. Exported so the bid picker can
+// list them without duplicating this table.
+//
+// `FCL` was here until 10 Aug 26 and is gone at the owner's instruction. It
+// had never been expanded — the spec recorded that its meaning was never
+// confirmed — so it was a code nobody could explain and a counter nobody
+// could reconcile.
 export const LEAVE_TYPES: LeaveType[] = [
   { type: 'LL', label: 'local leave', counter: 'annual' },
   { type: 'OL', label: 'overseas leave', counter: 'annual' },
@@ -43,7 +48,6 @@ export const LEAVE_TYPES: LeaveType[] = [
   { type: 'PCL', label: 'parentcare leave', counter: 'pcl' },
   { type: 'PL', label: 'paternity leave', counter: 'pl' },
   { type: 'EL', label: 'embarkation leave', counter: 'el' },
-  { type: 'FCL', label: 'FCL', counter: 'fcl' },
 ]
 
 const LEAVE_TYPE_BY_CODE: Record<string, LeaveType> = Object.fromEntries(
