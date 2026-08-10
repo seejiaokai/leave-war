@@ -28,12 +28,11 @@ Everything is built to make that change small: all persistence goes through one
 module (`src/state/storage.ts`), and every write goes through one function
 (`setCell`). Nothing else in the codebase touches either.
 
-Storage now holds six keys, not one: `grid`, `states`, `stage`, `role`,
-`openings` and `ledger`. They are written together by a single `persist()` so
-no path can save one and forget another, and `initStore` reconciles grid and
-states on load — a stored state whose cell no longer holds a bid is dropped
-rather than left to colour the wrong cell. Seeded states are attached only to
-a seeded grid, never to a grid the squadron has already written.
+Storage now holds five keys, not one: `wars` (each carrying its own period,
+grid and states), `current`, `role`, `openings` and `ledger`. They are written together by a single `persist()` so
+no path can save one and forget another, and `initStore` reconciles each
+war's grid and states on load — a stored state whose cell no longer holds a
+bid is dropped rather than left to colour the wrong cell.
 
 Stored states written before bids carried a source are **bare strings**, and
 they are migrated on load rather than rejected: a string could only ever have
@@ -85,6 +84,22 @@ says every change to a counter is a ledger entry, and **leave taken is not
 posted to the ledger here**. The grid is already that record, and a second
 copy of it would be a second version of the truth. The ledger holds only what
 the grid cannot know.
+
+## Wars, and what is not built about them
+
+An admin can create a leave war over any span and switch between them. Three
+things are deliberately absent:
+
+- **No war can be deleted or renamed.** Nothing removes one, which is why
+  `wars` is never empty and `withCurrent` can fall back to the first. A war
+  created by mistake stays.
+- **A war's requirements are shared, not per-war.** `Requirements` still sits
+  at the top of the store, so every war is judged against the same manning
+  rules. Real squadrons vary them by period; the rules editor is where that
+  belongs.
+- **Nothing stops a war being created in the past**, or a hundred of them.
+  There is no sanity bound on the dates beyond "end not before start" and
+  "no overlap".
 
 ## Removing a leave type is a breaking data change
 

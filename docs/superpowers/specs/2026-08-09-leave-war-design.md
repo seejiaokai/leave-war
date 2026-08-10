@@ -192,11 +192,27 @@ in the interface decides which controls appear and nothing else. See
 
 ### Periods
 
-**Settled, 9 Aug 26.** A period is a **date range the admin chooses**,
-selectable down to a single month. A quarter is the common case — the
-reference workbook is quarterly, and the seed runs Jan–Mar — but it is not a
-constraint. The admin opens one when the schedule firms up rather than on any
-calendar trigger.
+**Settled, 9 Aug 26, and built 10 Aug 26.** A period is a **date range the
+admin chooses**, selectable down to a single month. A quarter is the common
+case — the reference workbook is quarterly, and the seed runs Jan–Mar — but
+it is not a constraint. The admin opens one when the schedule firms up rather
+than on any calendar trigger.
+
+Many periods exist at once and one is on screen. A **leave war** is a period
+together with the leave and bids inside it; the three travel as a unit so a
+grid cannot belong to the wrong period. Creating one is an admin act, it
+lands in draft, and it does not take the screen.
+
+**A date belongs to at most one leave war.** Overlap is refused on creation
+and rejected on load. Two wars covering 5 January would let a person hold
+leave that day twice over: the manning counts would count him away twice, his
+balance would be drawn twice, and nothing downstream could say which war was
+the real one.
+
+**Entitlements are continuous; leave wars are windows onto them.** Annual
+leave and OIL do not reset when a quarter closes, so a balance counts leave
+from **every** war, not the one being looked at. A figure counting only the
+current war would let the same twenty days be bid twice, once in each.
 
 Two things follow. The engine already models this correctly: `Period` carries
 free `start`/`end` strings and `buildDays` builds any span, so a month-length
