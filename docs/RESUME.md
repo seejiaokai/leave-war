@@ -7,19 +7,20 @@ not have to reconstruct it from `git log`.
 
 **State as of 10 Aug 26, after the owner's phone review and a second round of
 their notes.** 562 unit tests, 115 Playwright runs across a phone and a
-desktop project, clean build, all verified first-hand. Work sits on
-`claude/bidding-plan-continuation-vqnrfz`, branched from `main`.
+desktop project, clean build, all verified first-hand. Work continues on
+`claude/bidding-plan-continuation-vqnrfz`, and **`main` is merged up to it** —
+see the merge agreement in `CLAUDE.md`.
 
-> **Read this before you start.** `main`'s own `docs/RESUME.md` still says
-> "`main` is the only branch and the default". That was true when it was
-> written and false eight minutes later, when this branch began. On 10 Aug a
-> session took it at its word, never ran `git branch -a`, and rebuilt the
-> whole bidding plan from scratch on a second branch
-> (`claude/resume-docs-5rgc42`) — nine commits duplicating the first nine
-> here, then diverging on the period model, the bid states and FCL. That work
-> is discarded; only three of its ideas survived, and they are the three
-> owner's notes listed below. **Check the remote for branches before trusting
-> any prose about which one is live**, including this paragraph.
+> **Why `main` is kept current.** It did not used to be. `main`'s RESUME once
+> said "`main` is the only branch and the default"; that was true when written
+> and false eight minutes later, when this branch began. On 10 Aug a session
+> took it at its word, never ran `git branch -a`, and rebuilt the whole
+> bidding plan from scratch on a second branch — nine commits duplicating the
+> first nine here, then diverging on the period model, the bid states and FCL.
+> That branch is discarded; three of its ideas survived and are listed below.
+> Every change now ends merged into `main`, gated on a green suite, build and
+> browser gate. **Still check the remote for branches before trusting any
+> prose about which one is live**, including this paragraph.
 
 ## What exists
 
